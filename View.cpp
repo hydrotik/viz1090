@@ -368,8 +368,8 @@ void View::drawStatus() {
     }
 
     if(map.loaded < 100) {
-	char loaded[20] = " ";
-        snprintf(loaded, 20, "loading map %d%%", map.loaded);	
+	char loaded[32] = " ";
+        snprintf(loaded, 32, "loading map %d%%", map.loaded);
         drawStatusBox(&left,&top,"init", loaded, style.orange);
     }
 }

@@ -29,6 +29,7 @@
 //
 
 #include "dump1090.h"
+#include <sys/time.h>
 //
 // ============================= Utility functions ==========================
 //
