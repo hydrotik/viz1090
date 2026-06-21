@@ -145,6 +145,7 @@ int main(int argc, char **argv) {
             }
             appData.modes.fUserLat = lat;
             view.centerLat = appData.modes.fUserLat;
+            view.currentLat = view.centerLat;
         } else if (!strcmp(argv[j],"--lon")) {
             requireArgs(argc, j, 1, argv[j]);
             float lon = 0.0f;
@@ -155,6 +156,7 @@ int main(int argc, char **argv) {
             }
             appData.modes.fUserLon = lon;
             view.centerLon = appData.modes.fUserLon;
+            view.currentLon = view.centerLon;
         } else if (!strcmp(argv[j],"--metric")) {
             view.metric = 1;
         } else if (!strcmp(argv[j],"--plane-scale")) {

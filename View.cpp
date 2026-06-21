@@ -746,8 +746,9 @@ void View::drawPlaceNames() {
 }
 
 void View::drawGeography() {
+    bool zoomChanged = fabs(currentMaxDist - maxDist) > 0.0001f;
 
-    if((mapRedraw && !mapMoved) || (mapAnimating && elapsed(lastRedraw) > 8 * FRAMETIME) ||  elapsed(lastRedraw) > 2000 || (map.loaded < 100 && elapsed(lastRedraw) > 250)) {
+    if((mapRedraw && !mapMoved) || (mapMoved && zoomChanged) || (mapAnimating && elapsed(lastRedraw) > 8 * FRAMETIME) ||  elapsed(lastRedraw) > 2000 || (map.loaded < 100 && elapsed(lastRedraw) > 250)) {
 
         SDL_SetRenderTarget(renderer, mapTexture);
         
@@ -1450,6 +1451,9 @@ View::View(AppData *appData){
     centerLat   = 0;
 
     maxDist                 = 25.0;
+    currentLon              = centerLon;
+    currentLat              = centerLat;
+    currentMaxDist          = maxDist;
 
     mapMoved         = 1;
     mapRedraw        = 1;
