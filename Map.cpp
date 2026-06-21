@@ -38,6 +38,9 @@
 #include <iostream>
 #include <cmath>
 
+static const int MAX_QTREE_DEPTH = 28;
+static const float MIN_QTREE_SPAN = 0.00001f;
+
 static std::string joinPath(const std::string &dir, const char *name) {
   if(dir.empty() || dir == ".") {
     return std::string(name);
@@ -51,15 +54,9 @@ static std::string joinPath(const std::string &dir, const char *name) {
 }
 
 bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
-
-  // if(depth > 25) {
-  //  // printf("fail [%f %f] -> [%f %f]\n",line->start.lon,line->start.lat,line->end.lon,line->end.lat);
-
-  //  // printf("bounds %f %f %f %f\n",tree->lon_min, tree->lon_max, tree->lat_min, tree->lat_max);
-  //   // fflush(stdout); 
-  //    tree->lines.push_back(&(*line));
-  //    return true;
-  // }
+  if(tree == NULL) {
+    return false;
+  }
   
 
   bool startInside = line->start.lat >= tree->lat_min &&
@@ -79,6 +76,13 @@ bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
     return false; 
   }
   
+  if(depth >= MAX_QTREE_DEPTH ||
+     fabs(tree->lat_max - tree->lat_min) <= MIN_QTREE_SPAN ||
+     fabs(tree->lon_max - tree->lon_min) <= MIN_QTREE_SPAN) {
+    tree->lines.push_back(&(*line));
+    return true;
+  }
+
   if (startInside != endInside) {
     tree->lines.push_back(&(*line));
     return true; 
@@ -93,7 +97,7 @@ bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
   	tree->nw->lon_max = tree->lon_min + 0.5 * (tree->lon_max - tree->lon_min);
   }
 
-  if (QTInsert(tree->nw, line, depth++)){
+  if (QTInsert(tree->nw, line, depth + 1)){
   	return true;
   }
 
@@ -106,7 +110,7 @@ bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
   	tree->sw->lon_max = tree->lon_max;
   }
 
-	if (QTInsert(tree->sw, line, depth++)){
+	if (QTInsert(tree->sw, line, depth + 1)){
 	 return true;
   }
 
@@ -119,7 +123,7 @@ bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
   	tree->ne->lon_max = tree->lon_min + 0.5 * (tree->lon_max - tree->lon_min);
   } 
 
-  if (QTInsert(tree->ne, line, depth++)){
+  if (QTInsert(tree->ne, line, depth + 1)){
   	return true;	
   } 	
 
@@ -132,7 +136,7 @@ bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
   	tree->se->lon_max = tree->lon_max;
 	}  
 
-  if (QTInsert(tree->se, line, depth++)){
+  if (QTInsert(tree->se, line, depth + 1)){
   	return true;	
 	} 
 	

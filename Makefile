@@ -21,7 +21,7 @@ LIBS= -lm $(SDL_LIBS) -lpthread -g
 all: viz1090
 
 APP_OBJS = viz1090.o AppData.o AircraftList.o Aircraft.o Label.o AircraftLabel.o anet.o interactive.o mode_ac.o mode_s.o net_io.o Input.o View.o Map.o parula.o monokai.o
-CORE_TEST_OBJS = tests/core_tests.o AircraftList.o Aircraft.o interactive.o mode_ac.o mode_s.o
+CORE_TEST_OBJS = tests/core_tests.o AircraftList.o Aircraft.o Map.o interactive.o mode_ac.o mode_s.o
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRACFLAGS) -c $< -o $@

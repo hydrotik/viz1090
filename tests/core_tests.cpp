@@ -1,4 +1,5 @@
 #include "AircraftList.h"
+#include "Map.h"
 
 #include <cmath>
 #include <cstdio>
@@ -183,11 +184,32 @@ static void testModeSPositionFixture() {
     freeAircrafts(&modes);
 }
 
+static void testMapQuadtreeDegenerateLine() {
+    Map map;
+    map.root.lon_min = -180.0f;
+    map.root.lon_max = -52.0f;
+    map.root.lat_min = 17.0f;
+    map.root.lat_max = 72.0f;
+
+    Point point;
+    point.lon = -73.845139f;
+    point.lat = 40.723972f;
+
+    Line line(point, point);
+    CHECK_TRUE(map.QTInsert(&map.root, &line, 0));
+    CHECK_TRUE(!map.root.lines.empty() ||
+               map.root.nw != NULL ||
+               map.root.ne != NULL ||
+               map.root.sw != NULL ||
+               map.root.se != NULL);
+}
+
 int main() {
     testAircraftHistory();
     testAircraftListUpdateAndRemoval();
     testModeSCallsignFixture();
     testModeSPositionFixture();
+    testMapQuadtreeDegenerateLine();
 
     if(failures) {
         std::fprintf(stderr, "%d core test failure(s)\n", failures);
