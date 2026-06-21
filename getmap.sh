@@ -9,6 +9,7 @@ MINPOP=100000
 TOLERANCE=0.001
 BBOX=""
 ROADS="auto"
+WATER="auto"
 
 usage() {
     cat <<'EOF'
@@ -24,15 +25,17 @@ Options:
   --bbox <bounds>        Clip to lon_min,lat_min,lon_max,lat_max.
   --roads                Include Natural Earth roads.
   --no-roads             Do not include roads.
+  --water                Include lakes and river centerlines.
+  --no-water             Do not include lakes and river centerlines.
   --minpop <number>      Minimum city population label. Default: 100000.
   --tolerance <number>   Geometry simplification tolerance. Default: 0.001.
   --help                 Show this help.
 
-Example for New York regional offline assets:
-  ./getmap.sh --output-dir mapdata/generated/nyc --bbox -75,39.8,-71.8,42.2
+Example for Northeast US regional offline assets:
+  ./getmap.sh --output-dir mapdata/generated/northeast --bbox -82,36,-65,48.5 --roads --water --tolerance 0.00025 --minpop 25000
 
 Run viz1090 with:
-  ./viz1090 --mapdir mapdata/generated/nyc --theme atc --lat 40.723972 --lon -73.845139
+  ./viz1090 --mapdir mapdata/generated/northeast --theme atc --lat 40.723972 --lon -73.845139
 EOF
 }
 
@@ -64,6 +67,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-roads)
             ROADS="no"
+            shift
+            ;;
+        --water)
+            WATER="yes"
+            shift
+            ;;
+        --no-water)
+            WATER="no"
             shift
             ;;
         --minpop)
@@ -194,10 +205,27 @@ if [[ "${ROADS}" == "yes" || ( "${ROADS}" == "auto" && -n "${BBOX}" ) ]]; then
     INCLUDE_ROADS=1
 fi
 
+INCLUDE_WATER=0
+if [[ "${WATER}" == "yes" || ( "${WATER}" == "auto" && -n "${BBOX}" ) ]]; then
+    INCLUDE_WATER=1
+fi
+
 ROADS_AVAILABLE=0
 if [[ "${INCLUDE_ROADS}" -eq 1 ]]; then
     if download_optional_source "ne_10m_roads.zip" "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_roads.zip"; then
         ROADS_AVAILABLE=1
+    fi
+fi
+
+LAKES_AVAILABLE=0
+RIVERS_AVAILABLE=0
+if [[ "${INCLUDE_WATER}" -eq 1 ]]; then
+    if download_optional_source "ne_10m_lakes.zip" "https://naciscdn.org/naturalearth/10m/physical/ne_10m_lakes.zip"; then
+        LAKES_AVAILABLE=1
+    fi
+
+    if download_optional_source "ne_10m_rivers_lake_centerlines.zip" "https://naciscdn.org/naturalearth/10m/physical/ne_10m_rivers_lake_centerlines.zip"; then
+        RIVERS_AVAILABLE=1
     fi
 fi
 
@@ -215,6 +243,12 @@ extract_source "ne_10m_airports.zip"
 if [[ "${ROADS_AVAILABLE}" -eq 1 ]]; then
     extract_source "ne_10m_roads.zip"
 fi
+if [[ "${LAKES_AVAILABLE}" -eq 1 ]]; then
+    extract_source "ne_10m_lakes.zip"
+fi
+if [[ "${RIVERS_AVAILABLE}" -eq 1 ]]; then
+    extract_source "ne_10m_rivers_lake_centerlines.zip"
+fi
 if [[ "${RUNWAYS_AVAILABLE}" -eq 1 ]]; then
     extract_source "faa_runways.zip"
 fi
@@ -231,6 +265,14 @@ converter_args=(
 
 if [[ "${ROADS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_roads.shp" ]]; then
     converter_args+=(--mapfile "${WORK_DIR}/ne_10m_roads.shp")
+fi
+
+if [[ "${LAKES_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_lakes.shp" ]]; then
+    converter_args+=(--mapfile "${WORK_DIR}/ne_10m_lakes.shp")
+fi
+
+if [[ "${RIVERS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_rivers_lake_centerlines.shp" ]]; then
+    converter_args+=(--mapfile "${WORK_DIR}/ne_10m_rivers_lake_centerlines.shp")
 fi
 
 if [[ "${RUNWAYS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/Runways.shp" ]]; then

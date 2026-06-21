@@ -137,11 +137,11 @@ cd ~/viz1090
 ./run_uconsole.sh
 ```
 
-`run_uconsole.sh` builds the binary when needed, generates `mapdata/generated/nyc` when missing, and launches with `--theme atc`, `--mapdir mapdata/generated/nyc`, `--screensize 1280 720`, and the observed coordinates. It tries to read GPS first via `tools/gps_fix.py`, then falls back to the configured/default `--lat` and `--lon`; use `--no-gps` to skip GPS. Its default map tolerance is `0.0001` for more local detail than the original `0.001`; use `--regen-map --tolerance 0.00005` for a denser local map if rendering remains fast enough. It defaults to `--plane-scale 1.5 --label-scale 1.9 --status-scale 1.8` so aircraft, aircraft labels, and the bottom status strip are readable on the uConsole's small high-resolution screen without doubling all UI.
+`run_uconsole.sh` builds the binary when needed, generates `mapdata/generated/northeast` when missing, and launches with `--theme atc`, `--mapdir mapdata/generated/northeast`, `--screensize 1280 720`, and the observed coordinates. The default bbox is `-82,36,-65,48.5`, covering much more of the Northeast US than the earlier NYC-only bbox `-75,39.8,-71.8,42.2`; this prevents zoomed-out regional views from showing blank clipped map space. It tries to read GPS first via `tools/gps_fix.py`, then falls back to the configured/default `--lat` and `--lon`; use `--no-gps` to skip GPS. Its default map tolerance is `0.00025`, with roads, lakes, and river centerlines enabled. Use `--regen-map --tolerance 0.0001` for a denser map if rendering remains fast enough, or increase tolerance if redraw becomes slow. It defaults to `--plane-scale 1.5 --label-scale 1.9 --status-scale 1.8` so aircraft, aircraft labels, and the bottom status strip are readable on the uConsole's small high-resolution screen without doubling all UI.
 
 When syncing code from the Mac to the uConsole, keep `mapdata/` out of `rsync --delete` operations. `mapdata/cache` and `mapdata/generated` are device-local offline assets and should survive source updates unless intentionally regenerated.
 
-The generated vector map now combines state/province outlines, coastlines, local roads when a `--bbox` is provided, airport labels, and runway geometry. FAA runway outline downloads are optional; if that ArcGIS endpoint fails, `getmap.sh` falls back to OurAirports `runways.csv` and generates runway centerlines. The original admin-boundary-only map can look blank at a close 25 km New York zoom, so coastlines/roads/runways are important for a visible local map.
+The generated vector map now combines state/province outlines, coastlines, roads, lakes, river centerlines, airport labels, and runway geometry. FAA runway outline downloads are optional; if that ArcGIS endpoint fails, `getmap.sh` falls back to OurAirports `runways.csv` and generates runway centerlines. The original admin-boundary-only map can look blank at a close 25 km New York zoom, and the older NYC-only bbox clips out geography when zooming out; coastlines/roads/water/runways plus a wider Northeast bbox are important for a visible regional map.
 
 Aircraft labels include heuristic category markers:
 
@@ -167,7 +167,7 @@ Use `./run_uconsole.sh --debug-input` to print SDL input events when validating 
 After one successful online run, the same map can be regenerated without network:
 
 ```sh
-./getmap.sh --offline --output-dir mapdata/generated/nyc --bbox -75,39.8,-71.8,42.2
+./getmap.sh --offline --output-dir mapdata/generated/northeast --bbox -82,36,-65,48.5 --roads --water --tolerance 0.00025 --minpop 25000
 ```
 
 Use `--theme atc` for the high-contrast radar/WarGames-style view, `--theme map` for a muted vector-map look, and `--theme classic` for the original palette. If map drawing is slow, increase `mapconverter.py --tolerance` above the default `0.001` and/or raise `--minpop` to reduce labels.

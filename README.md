@@ -90,13 +90,13 @@ For portable/offline use, run the download once, then reuse the cached sources:
 ./getmap.sh --offline --output-dir mapdata/generated/default
 ```
 
-For a smaller regional map around New York:
+For a Northeast US regional map with enough coverage for zoomed-out uConsole use:
 
 ```
-./getmap.sh --output-dir mapdata/generated/nyc --bbox -75,39.8,-71.8,42.2
+./getmap.sh --output-dir mapdata/generated/northeast --bbox -82,36,-65,48.5 --roads --water --tolerance 0.00025 --minpop 25000
 ```
 
-On a ClockworkPi uConsole, the wrapper script builds if needed, generates this regional map if missing, and launches the app with the recommended 1280x720 fullscreen settings:
+On a ClockworkPi uConsole, the wrapper script builds if needed, generates this Northeast regional map if missing, and launches the app with the recommended 1280x720 fullscreen settings:
 
 ```
 ./run_uconsole.sh
@@ -128,6 +128,12 @@ For a more detailed local map, regenerate with a lower simplification tolerance:
 
 ```
 ./run_uconsole.sh --regen-map --tolerance 0.00005
+```
+
+If you previously generated only the smaller NYC map, force the new larger Northeast map once:
+
+```
+./run_uconsole.sh --regen-map
 ```
 
 The uConsole wrapper also enlarges aircraft icons and aircraft labels by default. Tune those independently:
@@ -232,6 +238,10 @@ The best map data source I've found so far is https://www.naturalearthdata.com. 
 I've been using these files:
 
 * [Map geometry](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_1_states_provinces.zip) 
+* [Coastlines](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/physical/ne_10m_coastline.zip)
+* [Lakes](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/physical/ne_10m_lakes.zip)
+* [Rivers and lake centerlines](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/physical/ne_10m_rivers_lake_centerlines.zip)
+* [Roads](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_roads.zip)
 * [Place names](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_populated_places.zip) 
 * [Airport IATA codes](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_airports.zip) 
 * [Airport runway geometry](https://opendata.arcgis.com/datasets/4d8fa46181aa470d809776c57a8ab1f6_0.zip)  
@@ -241,7 +251,7 @@ The bash script getmap.sh will download (so long as the links don't break) and c
 The generated map files can live outside the repository root. Use `--mapdir` when starting viz1090:
 
 ```
-./viz1090 --mapdir mapdata/generated/nyc --theme atc --lat 40.723972 --lon -73.845139
+./viz1090 --mapdir mapdata/generated/northeast --theme atc --lat 40.723972 --lon -73.845139
 ```
 
 ### MAPCONVERTER.PY RUNTIME OPTIONS
