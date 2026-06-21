@@ -221,10 +221,10 @@ Implementation options:
 
 Near-term radar-only weather plan:
 
-1. Install/test `dump978` or `dump978-fa` on the uConsole.
+1. Install/test `dump978-fa` on the uConsole with `tools/install_dump978_fa.sh`. FlightAware documents `dump978-fa` as the 978 MHz UAT decoder; it can expose decoded JSON on `--json-port` and uses SoapySDR with `--sdr driver=rtlsdr`.
 2. Verify whether the installed SDR expansion exposes one tuner or multiple tuners.
-3. If one tuner: create a scheduler that samples 978 MHz every few minutes and writes decoded FIS-B radar/NEXRAD artifacts to disk, then returns to `dump1090-mutability`.
-4. Add a radar overlay reader in viz1090 after decoded FIS-B radar artifacts are available.
+3. If one tuner: use `run_uat_weather_cycle.sh` to stop `dump1090-mutability`, sample 978 MHz every few minutes through `tools/uat_weather_cycle.py`, write decoded JSON to `weather/uat_messages.jsonl`, update `weather/radar_tiles.csv` when recognizable radar tiles are present, then restart `dump1090-mutability`.
+4. Inspect real `weather/uat_messages.jsonl` captures and extend `tools/uat_weather_cycle.py` for the exact FIS-B/NEXRAD JSON product shape emitted by the installed decoder.
 5. Defer non-radar products such as lightning, cloud tops, icing, turbulence, NOTAMs, and text weather until the radar path is proven.
 
 Weather UI validation:
@@ -232,6 +232,7 @@ Weather UI validation:
 - `--simulate-weather` draws a simulated moving NEXRAD-like radar tile grid over the map under aircraft.
 - `./run_uconsole.sh --simulate-weather` is the uConsole validation path.
 - `tools/generate_weather_fixture.py` can write a static `weather/radar_tiles.csv` cache for UI screenshots/tests.
+- `tools/uat_weather_cycle.py` is the live UAT/FIS-B capture bridge. It preserves existing radar cache files if a capture yields no recognized radar tiles, so a no-signal capture does not erase the last useful overlay.
 - `--weather-file <path>` renders rows of `lat_min,lon_min,lat_max,lon_max,intensity`, where intensity is 1 green, 2 yellow, 3 red, 4 magenta.
 - This is only a UI overlay simulator; it is not live weather and should not be used for navigation decisions.
 

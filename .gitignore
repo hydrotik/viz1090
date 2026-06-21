@@ -27,6 +27,7 @@ mapnames
 
 mapdata/cache/
 mapdata/work/
+weather/
 
 viz1090
 tests/core_tests

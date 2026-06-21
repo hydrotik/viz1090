@@ -157,6 +157,26 @@ python3 tools/generate_weather_fixture.py --output weather/radar_tiles.csv
 ./run_uconsole.sh --weather-file weather/radar_tiles.csv
 ```
 
+To try real OTA FIS-B weather on the uConsole, install `dump978-fa` once:
+
+```
+tools/install_dump978_fa.sh
+```
+
+Then run one UAT capture cycle:
+
+```
+./run_uat_weather_cycle.sh --duration 90
+```
+
+With one RTL-SDR tuner, this stops `dump1090-mutability`, samples 978 MHz UAT/FIS-B through `dump978-fa`, writes raw decoded JSON to `weather/uat_messages.jsonl`, updates `weather/radar_tiles.csv` when recognizable radar tile records are present, then restarts `dump1090-mutability`. For repeated background sampling:
+
+```
+./run_uat_weather_cycle.sh --loop --duration 90 --interval 240
+```
+
+The first real capture may only populate `weather/uat_messages.jsonl`; that is still useful because it shows the actual decoded FIS-B product shape we need to support.
+
 See [CONTROLS.md](CONTROLS.md) for the full keyboard, pointer, and uConsole physical key map. Current uConsole defaults:
 
 | uConsole control | Action |
