@@ -149,18 +149,16 @@ python3 tools/generate_weather_fixture.py --output weather/radar_tiles.csv
 ./run_uconsole.sh --weather-file weather/radar_tiles.csv
 ```
 
-uConsole-friendly controls:
+See [CONTROLS.md](CONTROLS.md) for the full keyboard, pointer, and uConsole physical key map. Current uConsole defaults:
 
-- Trackball moves the pointer; left-click and drag pans the map.
-- Mouse wheel events zoom if the trackball/OS emits them.
-- Arrow keys, WASD, or HJKL pan the map.
-- `+`, keypad `+`, or PageUp zoom in.
-- `-`, keypad `-`, or PageDown zoom out.
-- uConsole D-pad/controller arrows pan when exposed through SDL as controller or joystick input.
-- uConsole `X` zooms in, `Y` zooms out, `A` recenters, and `B` toggles dark/light mode when exposed as raw joystick buttons.
-- uConsole `L` zooms out and `R` zooms in when exposed as mouse buttons at `(0,0)`.
-- Home or `r` recenters on the configured latitude/longitude.
-- `t` toggles between ATC dark mode and light mode.
+| uConsole control | Action |
+| --- | --- |
+| Top arrows | Pan north, south, west, and east |
+| `L` / `Y` | Zoom out |
+| `R` / `X` | Zoom in |
+| `A` | Recenter on configured or GPS-derived location |
+| `B` | Toggle ATC dark mode and light mode |
+| Trackball drag | Pan by pointer drag |
 
 If a physical uConsole key does not behave as expected, run `./run_uconsole.sh --debug-input` and press that key. The terminal will print whether SDL sees it as a keyboard key, mouse button, controller button, joystick button, or hat/D-pad event.
 

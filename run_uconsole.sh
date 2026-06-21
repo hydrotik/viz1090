@@ -45,7 +45,7 @@ Options:
   --bbox <bounds>     Map bbox lon_min,lat_min,lon_max,lat_max.
   --mapdir <path>     Generated map directory. Default: mapdata/generated/nyc
   --weather-file <path> Radar tile cache file. Default: weather/radar_tiles.csv
-  --theme <name>      classic, atc, or map. Default: atc
+  --theme <name>      classic, atc, map, or light. Default: atc
   --uiscale <value>   UI scale. Default: 1
   --plane-scale <n>   Aircraft icon scale. Default: 1.5
   --label-scale <n>   Aircraft label scale. Default: 1.9

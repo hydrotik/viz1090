@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
             requireArgs(argc, j, 1, argv[j]);
             const char *themeName = argv[++j];
             if(!view.setTheme(themeName)) {
-                fprintf(stderr, "Invalid theme '%s'. Valid themes: classic, atc, map.\n\n", themeName);
+                fprintf(stderr, "Invalid theme '%s'. Valid themes: classic, atc, map, light.\n\n", themeName);
                 showHelp();
                 exit(1);
             }

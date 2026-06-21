@@ -149,19 +149,18 @@ Aircraft labels include heuristic category markers:
 - Orange dot: likely government/military based on common callsign prefixes or US military ICAO range.
 - No dot: unknown. This is not authoritative; better classification needs a local aircraft/operator database.
 
-uConsole input support:
+uConsole input support is documented in `CONTROLS.md`. Keep that file, `Input.cpp`, and this note aligned when physical key mappings change.
 
-- Trackball pointer movement is handled as normal SDL mouse motion.
-- Left-click drag pans the map.
-- Mouse wheel events zoom when the OS/input device emits them.
-- Arrow keys, WASD, and HJKL pan.
-- `+`, keypad `+`, and PageUp zoom in.
-- `-`, keypad `-`, and PageDown zoom out.
-- uConsole controller/D-pad events pan when SDL exposes the top arrow controls as controller or joystick hat input.
-- Observed uConsole mapping on 2026-06-21: `X` is raw joystick button `0`, `A` is `1`, `B` is `2`, and `Y` is `3`. The app maps `X` zoom in, `Y` zoom out, `A` recenter, and `B` toggle dark/light mode.
-- Observed `L` is mouse button `1` at `(0,0)` and `R` is mouse button `3` at `(0,0)`. The app treats those synthetic origin mouse events as `L` zoom out and `R` zoom in instead of normal clicks.
-- Home or `r` recenters on the configured latitude/longitude.
-- `t` toggles between ATC dark mode and light mode.
+Current observed uConsole mapping on 2026-06-21:
+
+- Top arrows arrive as keyboard arrow keys and pan north/south/west/east.
+- `L` arrives as mouse button `1` at `(0,0)` and maps to zoom out.
+- `R` arrives as mouse button `3` at `(0,0)` and maps to zoom in.
+- `X` is raw joystick button `0` and maps to zoom in.
+- `A` is raw joystick button `1` and maps to recenter.
+- `B` is raw joystick button `2` and maps to ATC dark/light toggle.
+- `Y` is raw joystick button `3` and maps to zoom out.
+- Trackball press arrives as mouse button `2` at the pointer location and is left as a normal middle mouse click.
 
 Use `./run_uconsole.sh --debug-input` to print SDL input events when validating the physical uConsole keys. This is especially useful because some uConsole controls may appear as mouse buttons instead of keyboard/controller buttons; observed behavior included the `L` control acting like a left click/double click.
 
