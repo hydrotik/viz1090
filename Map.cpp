@@ -37,6 +37,19 @@
 #include <string>
 #include <iostream>
 #include <cmath>
+
+static std::string joinPath(const std::string &dir, const char *name) {
+  if(dir.empty() || dir == ".") {
+    return std::string(name);
+  }
+
+  if(dir[dir.size() - 1] == '/') {
+    return dir + name;
+  }
+
+  return dir + "/" + name;
+}
+
 bool Map::QTInsert(QuadTree *tree, Line *line, int depth) {
 
   // if(depth > 25) {
@@ -190,7 +203,12 @@ std::vector<Line*> Map::getLines(float screen_lat_min, float screen_lat_max, flo
 void Map::load() { 
   FILE *fileptr;
 
-  if((fileptr = fopen("mapdata.bin", "rb"))) {
+  std::string mapDataPath = joinPath(dataDir, "mapdata.bin");
+  std::string airportDataPath = joinPath(dataDir, "airportdata.bin");
+  std::string mapNamesPath = joinPath(dataDir, "mapnames");
+  std::string airportNamesPath = joinPath(dataDir, "airportnames");
+
+  if((fileptr = fopen(mapDataPath.c_str(), "rb"))) {
       
 
     fseek(fileptr, 0, SEEK_END);
@@ -209,7 +227,7 @@ void Map::load() {
   }
 
    
-   if((fileptr = fopen("airportdata.bin", "rb"))) {
+   if((fileptr = fopen(airportDataPath.c_str(), "rb"))) {
     fseek(fileptr, 0, SEEK_END);
     airportPoints_count = ftell(fileptr) / sizeof(float);
     rewind(fileptr);
@@ -338,7 +356,7 @@ void Map::load() {
 
 
   std::string line;
-  std::ifstream infile("mapnames");
+  std::ifstream infile(mapNamesPath.c_str());
 
 
   while (std::getline(infile, line))  
@@ -367,7 +385,7 @@ void Map::load() {
 
   infile.close();
 
-  infile.open("airportnames");
+  infile.open(airportNamesPath.c_str());
 
 
   while (std::getline(infile, line))  
@@ -401,8 +419,13 @@ void Map::load() {
   loaded = 100;
 }
 
+void Map::setDataDir(std::string path) {
+    dataDir = path;
+}
+
 Map::Map() {
     loaded = 0;
+    dataDir = ".";
 
     mapPoints_count = 0;
     mapPoints = NULL;

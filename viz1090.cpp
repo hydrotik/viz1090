@@ -32,6 +32,10 @@
 #include "AppData.h"
 #include "View.h"
 #include "Input.h"
+#include <cerrno>
+#include <climits>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring> 
 int go = 1;
 
@@ -51,14 +55,53 @@ void showHelp(void) {
 "--fullscreen                     Start fullscreen\n"
 "--help                           Show this help\n"
 "--lat <latitude>                 Latitude in degrees\n"
+"--label-scale <factor>           Aircraft label scaling (default: 1.0)\n"
 "--lon <longitude>                Longitude in degrees\n"
 "--metric                         Use metric units\n"
+"--plane-scale <factor>           Aircraft icon scaling (default: 1.0)\n"
 "--port <port>                    TCP Beast output listen port (default: 30005)\n"
 "--server <IPv4/hosname>          TCP Beast output listen IPv4 (default: 127.0.0.1)\n"
+"--mapdir <path>                  Directory containing generated map files (default: .)\n"
 "--screensize <width> <height>    Set frame buffer resolution (default: screen resolution)\n"
 "--screenindex <i>                Set the index of the display to use (default: 0)\n"
+"--simulate-weather               Draw a simulated moving radar storm cell\n"
+"--status-scale <factor>          Bottom status text scaling (default: 1.0)\n"
+"--theme <classic|atc|map|light>  Set UI/map color theme (default: classic)\n"
 "--uiscale <factor>               UI global scaling (default: 1)\n"  
+"--weather-file <path>            Radar tile cache file to render\n"
     );
+}
+
+static bool parseIntArg(const char *arg, int *out) {
+    char *end = NULL;
+    errno = 0;
+    long value = strtol(arg, &end, 10);
+    if(errno || end == arg || *end != '\0' || value < INT_MIN || value > INT_MAX) {
+        return false;
+    }
+
+    *out = static_cast<int>(value);
+    return true;
+}
+
+static bool parseFloatArg(const char *arg, float *out) {
+    char *end = NULL;
+    errno = 0;
+    float value = strtof(arg, &end);
+    if(errno || end == arg || *end != '\0') {
+        return false;
+    }
+
+    *out = value;
+    return true;
+}
+
+static void requireArgs(int argc, int current, int needed, const char *option) {
+    if(current + needed >= argc) {
+        fprintf(stderr, "Not enough arguments for option '%s'.\n\n", option);
+        showHelp();
+        exit(1);
+    }
 }
 
 
@@ -74,31 +117,101 @@ int main(int argc, char **argv) {
     
     // Parse the command line options
     for (int j = 1; j < argc; j++) {
-        int more = ((j + 1) < argc); // There are more arguments
-
-        if        (!strcmp(argv[j],"--port") && more) {
-            appData.modes.net_input_beast_port = atoi(argv[++j]);
-        } else if (!strcmp(argv[j],"--server") && more) {
-            std::strcpy(appData.server, argv[++j]);
-        } else if (!strcmp(argv[j],"--lat") && more) {
-            appData.modes.fUserLat = atof(argv[++j]);
+        if        (!strcmp(argv[j],"--port")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &appData.modes.net_input_beast_port) || appData.modes.net_input_beast_port <= 0 || appData.modes.net_input_beast_port > 65535) {
+                fprintf(stderr, "Invalid port '%s'.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--server")) {
+            requireArgs(argc, j, 1, argv[j]);
+            std::snprintf(appData.server, sizeof(appData.server), "%s", argv[++j]);
+        } else if (!strcmp(argv[j],"--mapdir")) {
+            requireArgs(argc, j, 1, argv[j]);
+            view.map.setDataDir(argv[++j]);
+        } else if (!strcmp(argv[j],"--weather-file")) {
+            requireArgs(argc, j, 1, argv[j]);
+            view.weather_file = argv[++j];
+        } else if (!strcmp(argv[j],"--lat")) {
+            requireArgs(argc, j, 1, argv[j]);
+            float lat = 0.0f;
+            if(!parseFloatArg(argv[++j], &lat) || lat < -90.0f || lat > 90.0f) {
+                fprintf(stderr, "Invalid latitude '%s'.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+            appData.modes.fUserLat = lat;
             view.centerLat = appData.modes.fUserLat;
-        } else if (!strcmp(argv[j],"--lon") && more) {
-            appData.modes.fUserLon = atof(argv[++j]);
+        } else if (!strcmp(argv[j],"--lon")) {
+            requireArgs(argc, j, 1, argv[j]);
+            float lon = 0.0f;
+            if(!parseFloatArg(argv[++j], &lon) || lon < -180.0f || lon > 180.0f) {
+                fprintf(stderr, "Invalid longitude '%s'.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+            appData.modes.fUserLon = lon;
             view.centerLon = appData.modes.fUserLon;
         } else if (!strcmp(argv[j],"--metric")) {
             view.metric = 1;
+        } else if (!strcmp(argv[j],"--plane-scale")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseFloatArg(argv[++j], &view.plane_scale) || view.plane_scale < 0.5f || view.plane_scale > 4.0f) {
+                fprintf(stderr, "Invalid plane scale '%s'. Expected 0.5 to 4.0.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--label-scale")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseFloatArg(argv[++j], &view.label_scale) || view.label_scale < 0.5f || view.label_scale > 4.0f) {
+                fprintf(stderr, "Invalid label scale '%s'. Expected 0.5 to 4.0.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--status-scale")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseFloatArg(argv[++j], &view.status_scale) || view.status_scale < 0.5f || view.status_scale > 4.0f) {
+                fprintf(stderr, "Invalid status scale '%s'. Expected 0.5 to 4.0.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--fps")) {
             view.fps = 1;
         } else if (!strcmp(argv[j],"--fullscreen")) {
             view.fullscreen = 1;
+        } else if (!strcmp(argv[j],"--simulate-weather")) {
+            view.simulate_weather = true;
+        } else if (!strcmp(argv[j],"--theme")) {
+            requireArgs(argc, j, 1, argv[j]);
+            const char *themeName = argv[++j];
+            if(!view.setTheme(themeName)) {
+                fprintf(stderr, "Invalid theme '%s'. Valid themes: classic, atc, map.\n\n", themeName);
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--screenindex")) {
-            view.screen_index = atoi(argv[++j]);
-        } else if (!strcmp(argv[j],"--uiscale") && more) {
-            view.screen_uiscale = atoi(argv[++j]);
-         } else if (!strcmp(argv[j],"--screensize") && more) {
-            view.screen_width = atoi(argv[++j]);
-            view.screen_height = atoi(argv[++j]);
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.screen_index) || view.screen_index < 0) {
+                fprintf(stderr, "Invalid screen index '%s'.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--uiscale")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.screen_uiscale) || view.screen_uiscale < 1) {
+                fprintf(stderr, "Invalid UI scale '%s'.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+         } else if (!strcmp(argv[j],"--screensize")) {
+            requireArgs(argc, j, 2, argv[j]);
+            if(!parseIntArg(argv[++j], &view.screen_width) || view.screen_width <= 0 ||
+               !parseIntArg(argv[++j], &view.screen_height) || view.screen_height <= 0) {
+                fprintf(stderr, "Invalid screen size.\n\n");
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--help")) {
             showHelp();
             exit(0);
@@ -111,6 +224,7 @@ int main(int argc, char **argv) {
 
 
     appData.initialize();
+    view.startMapLoad();
 
     view.SDL_init();
     view.font_init();

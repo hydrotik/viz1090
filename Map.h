@@ -102,15 +102,15 @@ typedef struct QuadTree{
 		}
 
 		if(sw != NULL) {
-			delete nw;
+			delete sw;
 		}
 
 		if(ne != NULL) {
-			delete nw;
+			delete ne;
 		}
 
-		if(ne != NULL) {
-			delete nw;
+		if(se != NULL) {
+			delete se;
 		}
 	}
 } QuadTree;
@@ -129,8 +129,11 @@ public:
 	std::vector<MapLabel*> airportnames;
 
 	void load();
+	void setDataDir(std::string path);
 	int loaded;
 	Map();
+
+	std::string dataDir;
 
 	int mapPoints_count;
 	float *mapPoints;	

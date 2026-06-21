@@ -73,16 +73,83 @@ cd viz1090
 make clean; make
 ```
 
-3. Download and process map data
+3. Download and process offline map data
 
 ```
-sudo apt install python3 python3-fiona python3-tqdm python3-shapely
-./getmap.sh
+sudo apt install python3 python3-fiona python3-tqdm python3-shapely python3-numpy wget unzip
+./getmap.sh --output-dir mapdata/generated/default
 ```
 
 This will produce files for map and airport geometry, with labels, that viz1090 reads. If any of these files don't exist then visualizer will show planes and trails without any geography.
 
 The default parameters for mapconverter should render reasonably quickly on a Raspberry Pi 4. See the mapconverter section below for other options and more information about map sources.
+
+For portable/offline use, run the download once, then reuse the cached sources:
+
+```
+./getmap.sh --offline --output-dir mapdata/generated/default
+```
+
+For a smaller regional map around New York:
+
+```
+./getmap.sh --output-dir mapdata/generated/nyc --bbox -75,39.8,-71.8,42.2
+```
+
+On a ClockworkPi uConsole, the wrapper script builds if needed, generates this regional map if missing, and launches the app with the recommended 1280x720 fullscreen settings:
+
+```
+./run_uconsole.sh
+```
+
+The wrapper tries to read GPS first, then falls back to configured coordinates. To skip GPS:
+
+```
+./run_uconsole.sh --no-gps
+```
+
+On HackerGadgets AIO V2 boards, GPS power is GPIO-controlled; the wrapper tries to enable GPIO 27 with `pinctrl` before reading GPS. Indoor GPS often fails to fix, especially after a cold start, so falling back to configured coordinates is expected indoors.
+
+For a more detailed local map, regenerate with a lower simplification tolerance:
+
+```
+./run_uconsole.sh --regen-map --tolerance 0.00005
+```
+
+The uConsole wrapper also enlarges aircraft icons and aircraft labels by default. Tune those independently:
+
+```
+./run_uconsole.sh --plane-scale 1.7 --label-scale 1.8 --status-scale 1.7
+```
+
+To validate the future radar overlay UI without live FIS-B weather:
+
+```
+./run_uconsole.sh --simulate-weather
+```
+
+The simulator uses the same radar-tile renderer as cached weather. To create a static sample cache:
+
+```
+python3 tools/generate_weather_fixture.py --output weather/radar_tiles.csv
+./run_uconsole.sh --weather-file weather/radar_tiles.csv
+```
+
+uConsole-friendly controls:
+
+- Trackball moves the pointer; left-click and drag pans the map.
+- Mouse wheel events zoom if the trackball/OS emits them.
+- Arrow keys, WASD, or HJKL pan the map.
+- `+`, keypad `+`, or PageUp zoom in.
+- `-`, keypad `-`, or PageDown zoom out.
+- Home or `r` recenters on the configured latitude/longitude.
+- `t` toggles between ATC dark mode and light mode.
+
+### uConsole GPS and Weather
+
+`run_uconsole.sh` reads GPS using `tools/gps_fix.py`. The helper first tries `gpsd`, then raw NMEA serial devices such as `/dev/serial/by-id/usb-ClockworkPI_uConsole_20230713-if01` and `/dev/ttyACM0`.
+
+Radar/precipitation over RF is a separate receive path from 1090 MHz ADS-B traffic. In the United States, ADS-B weather products are provided through FIS-B on UAT 978 MHz. With one RTL-SDR tuner, the practical approach is to periodically retune from 1090 MHz traffic to 978 MHz weather, cache decoded weather, then return to 1090 MHz. For simultaneous traffic and weather, use a second SDR/tuner.
 
 3. (Windows only)
 
@@ -115,7 +182,7 @@ dump1090 --net
 
 2. Run viz1090 
 ```
-./viz1090 --fullsceen --lat [your latitude] --lon [your longitude]
+./viz1090 --fullscreen --lat [your latitude] --lon [your longitude]
 ```
 
 viz1090 will open an SDL window set to the resolution of your screen.
@@ -129,8 +196,15 @@ viz1090 will open an SDL window set to the resolution of your screen.
 | --metric						| Display metric units | 
 | --lat                         | Specify your latitude in degrees | 
 | --lon                         | Specify your longitude in degrees | 
+| --mapdir [path]               | Directory containing generated `mapdata.bin`, `airportdata.bin`, `mapnames`, and `airportnames` |
+| --label-scale [factor]        | Scale aircraft labels independently from the rest of the UI |
+| --plane-scale [factor]        | Scale aircraft icons independently from the rest of the UI |
 | --screensize [width] [height]	| Specify a resolution, otherwise use resolution of display | 
+| --simulate-weather            | Draw a simulated moving radar tile grid for UI validation |
+| --theme [classic/atc/map/light] | Select the color theme. `classic` is the original look, `atc` is high-contrast radar style, `map` is a muted vector-map style, and `light` is a daylight map style |
+| --status-scale [factor]       | Scale the bottom status strip independently from the rest of the UI |
 | --uiscale [scale]				| Scale up UI elements by integer amounts for high resolution screen | 
+| --weather-file [path]         | Render a radar tile cache file with `lat_min,lon_min,lat_max,lon_max,intensity` rows |
 | --fullscreen					| Render fullscreen rather than in a window | 
 
 ### MAPS
@@ -145,7 +219,13 @@ I've been using these files:
 * [Airport IATA codes](https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_airports.zip) 
 * [Airport runway geometry](https://opendata.arcgis.com/datasets/4d8fa46181aa470d809776c57a8ab1f6_0.zip)  
 
-The bash script getmap.sh will download (so long as the links don't break) and convert these. Alternatively, you can pass shapefiles and other arguments to mapconverter.py directly
+The bash script getmap.sh will download (so long as the links don't break) and convert these into an offline cache under `mapdata/cache`, then generate viz1090 map files. Alternatively, you can pass shapefiles and other arguments to mapconverter.py directly.
+
+The generated map files can live outside the repository root. Use `--mapdir` when starting viz1090:
+
+```
+./viz1090 --mapdir mapdata/generated/nyc --theme atc --lat 40.723972 --lon -73.845139
+```
 
 ### MAPCONVERTER.PY RUNTIME OPTIONS
 
@@ -156,7 +236,9 @@ The bash script getmap.sh will download (so long as the links don't break) and c
 | --airportfile | shapefile for airport runway outlines |
 | --airportnames | shapefile for airport IATA names |
 | --minpop | minimum population to show place names for (defaults to 100000) |
-| --tolerance" | map simplification tolerance (defaults to 0.001, which works well on a Raspberry Pi 4 - smaller values will produce more detail but slow down the map refresh rate) |
+| --tolerance | map simplification tolerance (defaults to 0.001, which works well on a Raspberry Pi 4 - smaller values will produce more detail but slow down the map refresh rate) |
+| --bbox | optional `lon_min,lat_min,lon_max,lat_max` clipping bounds for smaller offline/regional maps |
+| --output-dir | directory where generated map files are written |
 
 ### HARDWARE NOTES
 

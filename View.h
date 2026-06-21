@@ -39,6 +39,7 @@
 #include "SDL2/SDL_ttf.h" 
 #include <chrono>
 #include <string>
+#include <vector>
 
 
 //defs - should all move to config file setup
@@ -57,6 +58,13 @@
 
 #define LATLONMULT 111.195 // 6371.0 * M_PI / 180.0
 
+typedef struct WeatherTile {
+    float lat_min;
+    float lat_max;
+    float lon_min;
+    float lon_max;
+    int intensity;
+} WeatherTile;
 
 class View {
 
@@ -107,6 +115,10 @@ class View {
 		void drawLines(int left, int top, int right, int bottom, int bailTime);
 		void drawPlaceNames();		
 		void drawGeography();
+		void drawWeatherOverlay();
+		void drawWeatherTiles();
+		void loadWeatherTiles();
+		void updateSimulatedWeatherTiles();
 		void drawSignalMarks(Aircraft *p, int x, int y);
 		void drawPlaneText(Aircraft *p);
 		void resolveLabelConflicts();
@@ -124,6 +136,9 @@ class View {
 		
 		void SDL_init();
 		void font_init();
+		bool setTheme(std::string themeName);
+		void toggleLightMode();
+		void startMapLoad();
 
 		View(AppData *appData);
 		~View();
@@ -157,6 +172,7 @@ class View {
 	    float lastFrameTime;
 	    std::chrono::high_resolution_clock::time_point drawStartTime;
 	    std::chrono::high_resolution_clock::time_point lastRedraw;
+	    std::chrono::high_resolution_clock::time_point weatherStartTime;
 
 	    Map map;
 
@@ -167,6 +183,14 @@ class View {
 	    int screen_depth;
 	    int fullscreen;
 	    int screen_index;
+	    float plane_scale;
+	    float label_scale;
+	    float status_scale;
+	    bool simulate_weather;
+	    std::string weather_file;
+	    std::vector<WeatherTile> weather_tiles;
+	    std::chrono::high_resolution_clock::time_point lastWeatherLoad;
+	    bool light_mode;
 
 		SDL_Window		*window;
 		SDL_Renderer	*renderer;
@@ -176,15 +200,18 @@ class View {
 		TTF_Font		*mapBoldFont;	
 		TTF_Font		*listFont;	
 
-		TTF_Font		*messageFont;	
-		TTF_Font		*labelFont;		
+		TTF_Font		*messageFont;
+		TTF_Font		*labelFont;
+		TTF_Font		*statusFont;
 
 		int mapFontWidth;
 		int mapFontHeight;
 		int labelFontWidth;
-		int labelFontHeight;	
+		int labelFontHeight;
 		int messageFontWidth;
 		int messageFontHeight;
+		int statusFontWidth;
+		int statusFontHeight;
 };
 
 #endif

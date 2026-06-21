@@ -1,24 +1,209 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-mkdir -p mapdata
-pushd mapdata > /dev/null
+DATA_DIR="mapdata"
+OUTPUT_DIR="."
+OFFLINE=0
+FORCE_DOWNLOAD=0
+MINPOP=100000
+TOLERANCE=0.001
+BBOX=""
+ROADS="auto"
 
-wget --no-verbose https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_1_states_provinces.zip
-wget --no-verbose https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places.zip
-wget --no-verbose https://naciscdn.org/naturalearth/10m/cultural/ne_10m_airports.zip
+usage() {
+    cat <<'EOF'
+Usage: ./getmap.sh [options]
 
-#this may not be up to date
-wget --no-verbose https://opendata.arcgis.com/datasets/4d8fa46181aa470d809776c57a8ab1f6_0.zip
+Downloads and converts offline vector map assets for viz1090.
 
-for file in *.zip; do
-    unzip -o "${file}"
-    rm "${file}"
+Options:
+  --offline              Use only files already present in mapdata/cache.
+  --force-download       Re-download sources even if cached files exist.
+  --data-dir <path>      Source cache/work directory. Default: mapdata.
+  --output-dir <path>    Generated map output directory. Default: current dir.
+  --bbox <bounds>        Clip to lon_min,lat_min,lon_max,lat_max.
+  --roads                Include Natural Earth roads.
+  --no-roads             Do not include roads.
+  --minpop <number>      Minimum city population label. Default: 100000.
+  --tolerance <number>   Geometry simplification tolerance. Default: 0.001.
+  --help                 Show this help.
+
+Example for New York regional offline assets:
+  ./getmap.sh --output-dir mapdata/generated/nyc --bbox -75,39.8,-71.8,42.2
+
+Run viz1090 with:
+  ./viz1090 --mapdir mapdata/generated/nyc --theme atc --lat 40.723972 --lon -73.845139
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --offline)
+            OFFLINE=1
+            shift
+            ;;
+        --force-download)
+            FORCE_DOWNLOAD=1
+            shift
+            ;;
+        --data-dir)
+            DATA_DIR="$2"
+            shift 2
+            ;;
+        --output-dir)
+            OUTPUT_DIR="$2"
+            shift 2
+            ;;
+        --bbox)
+            BBOX="$2"
+            shift 2
+            ;;
+        --roads)
+            ROADS="yes"
+            shift
+            ;;
+        --no-roads)
+            ROADS="no"
+            shift
+            ;;
+        --minpop)
+            MINPOP="$2"
+            shift 2
+            ;;
+        --tolerance)
+            TOLERANCE="$2"
+            shift 2
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
 done
 
-popd > /dev/null
+CACHE_DIR="${DATA_DIR}/cache"
+WORK_DIR="${DATA_DIR}/work"
 
-python3 mapconverter.py \
-	--mapfile mapdata/ne_10m_admin_1_states_provinces.shp \
-	--mapnames mapdata/ne_10m_populated_places.shp \
-	--airportfile mapdata/Runways.shp \
-	--airportnames mapdata/ne_10m_airports.shp 
+mkdir -p "${CACHE_DIR}" "${WORK_DIR}" "${OUTPUT_DIR}"
+rm -rf "${WORK_DIR:?}/"*
+
+download_source() {
+    local filename="$1"
+    local url="$2"
+    local output="${CACHE_DIR}/${filename}"
+
+    if [[ -f "${output}" && "${FORCE_DOWNLOAD}" -eq 0 ]]; then
+        echo "Using cached ${filename}"
+        return
+    fi
+
+    if [[ "${OFFLINE}" -eq 1 ]]; then
+        echo "Missing cached source ${output}; cannot continue in --offline mode." >&2
+        exit 1
+    fi
+
+    echo "Downloading ${filename}"
+    wget --no-verbose -O "${output}" "${url}"
+}
+
+download_optional_source() {
+    local filename="$1"
+    local url="$2"
+    local output="${CACHE_DIR}/${filename}"
+
+    if [[ -f "${output}" && "${FORCE_DOWNLOAD}" -eq 0 ]]; then
+        echo "Using cached ${filename}"
+        return 0
+    fi
+
+    if [[ "${OFFLINE}" -eq 1 ]]; then
+        echo "Optional cached source ${output} is missing; continuing without it." >&2
+        return 1
+    fi
+
+    echo "Downloading optional ${filename}"
+    if wget --no-verbose -O "${output}" "${url}"; then
+        return 0
+    fi
+
+    rm -f "${output}"
+    echo "Optional source ${filename} could not be downloaded; continuing without runway outlines." >&2
+    return 1
+}
+
+extract_source() {
+    local filename="$1"
+    unzip -q -o "${CACHE_DIR}/${filename}" -d "${WORK_DIR}"
+}
+
+download_source "ne_10m_admin_1_states_provinces.zip" "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_1_states_provinces.zip"
+download_source "ne_10m_coastline.zip" "https://naciscdn.org/naturalearth/10m/physical/ne_10m_coastline.zip"
+download_source "ne_10m_populated_places.zip" "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places.zip"
+download_source "ne_10m_airports.zip" "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_airports.zip"
+RUNWAY_CSV_AVAILABLE=0
+if download_optional_source "ourairports_runways.csv" "https://davidmegginson.github.io/ourairports-data/runways.csv"; then
+    RUNWAY_CSV_AVAILABLE=1
+fi
+
+INCLUDE_ROADS=0
+if [[ "${ROADS}" == "yes" || ( "${ROADS}" == "auto" && -n "${BBOX}" ) ]]; then
+    INCLUDE_ROADS=1
+fi
+
+ROADS_AVAILABLE=0
+if [[ "${INCLUDE_ROADS}" -eq 1 ]]; then
+    if download_optional_source "ne_10m_roads.zip" "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_roads.zip"; then
+        ROADS_AVAILABLE=1
+    fi
+fi
+
+# FAA runway geometry. This endpoint has changed before, so keep the downloaded
+# archive cached and prefer --offline after one successful fetch.
+RUNWAYS_AVAILABLE=0
+if download_optional_source "faa_runways.zip" "https://opendata.arcgis.com/datasets/4d8fa46181aa470d809776c57a8ab1f6_0.zip"; then
+    RUNWAYS_AVAILABLE=1
+fi
+
+extract_source "ne_10m_admin_1_states_provinces.zip"
+extract_source "ne_10m_coastline.zip"
+extract_source "ne_10m_populated_places.zip"
+extract_source "ne_10m_airports.zip"
+if [[ "${ROADS_AVAILABLE}" -eq 1 ]]; then
+    extract_source "ne_10m_roads.zip"
+fi
+if [[ "${RUNWAYS_AVAILABLE}" -eq 1 ]]; then
+    extract_source "faa_runways.zip"
+fi
+
+converter_args=(
+    --mapfile "${WORK_DIR}/ne_10m_admin_1_states_provinces.shp"
+    --mapfile "${WORK_DIR}/ne_10m_coastline.shp"
+    --mapnames "${WORK_DIR}/ne_10m_populated_places.shp"
+    --airportnames "${WORK_DIR}/ne_10m_airports.shp"
+    --output-dir "${OUTPUT_DIR}"
+    --minpop "${MINPOP}"
+    --tolerance "${TOLERANCE}"
+)
+
+if [[ "${ROADS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_roads.shp" ]]; then
+    converter_args+=(--mapfile "${WORK_DIR}/ne_10m_roads.shp")
+fi
+
+if [[ "${RUNWAYS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/Runways.shp" ]]; then
+    converter_args+=(--airportfile "${WORK_DIR}/Runways.shp")
+elif [[ "${RUNWAY_CSV_AVAILABLE}" -eq 1 && -f "${CACHE_DIR}/ourairports_runways.csv" ]]; then
+    converter_args+=(--airportcsv "${CACHE_DIR}/ourairports_runways.csv")
+fi
+
+if [[ -n "${BBOX}" ]]; then
+    converter_args+=("--bbox=${BBOX}")
+fi
+
+python3 mapconverter.py "${converter_args[@]}"
+
+echo "Generated offline map assets in ${OUTPUT_DIR}"

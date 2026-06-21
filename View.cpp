@@ -36,7 +36,11 @@
 
 #include "AircraftLabel.h"
 
+#include <algorithm>
+#include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <thread>
 
 using fmilliseconds = std::chrono::duration<float, std::milli>;
@@ -215,7 +219,8 @@ void View::font_init() {
     listFont = loadFont("font/TerminusTTF-4.46.0.ttf", 12 * screen_uiscale);
 
     messageFont = loadFont("font/TerminusTTF-Bold-4.46.0.ttf", 12 * screen_uiscale);
-    labelFont = loadFont("font/TerminusTTF-Bold-4.46.0.ttf", 12 * screen_uiscale);
+    labelFont = loadFont("font/TerminusTTF-Bold-4.46.0.ttf", static_cast<int>(12 * screen_uiscale * label_scale));
+    statusFont = loadFont("font/TerminusTTF-Bold-4.46.0.ttf", static_cast<int>(12 * screen_uiscale * status_scale));
 
     mapFontWidth = 5 * screen_uiscale;
     mapFontHeight = 12 * screen_uiscale; 
@@ -223,8 +228,10 @@ void View::font_init() {
     messageFontWidth = 6 * screen_uiscale;
     messageFontHeight = 12 * screen_uiscale; 
 
-    labelFontWidth = 6 * screen_uiscale;
-    labelFontHeight = 12 * screen_uiscale; 
+    labelFontWidth = static_cast<int>(6 * screen_uiscale * label_scale);
+    labelFontHeight = static_cast<int>(12 * screen_uiscale * label_scale);
+    statusFontWidth = static_cast<int>(6 * screen_uiscale * status_scale);
+    statusFontHeight = static_cast<int>(12 * screen_uiscale * status_scale);
 }
 
 
@@ -254,17 +261,38 @@ void View::SDL_init() {
 
     if(screen_width == 0) {
         SDL_DisplayMode DM;
-        SDL_GetCurrentDisplayMode(0, &DM);
+        if(SDL_GetCurrentDisplayMode(screen_index, &DM) != 0) {
+            printf("Could not get display mode for screen %d: %s\n", screen_index, SDL_GetError());
+            exit(1);
+        }
         screen_width = DM.w;
         screen_height= DM.h;
     }
 
     window =  SDL_CreateWindow("viz1090",  SDL_WINDOWPOS_CENTERED_DISPLAY(screen_index),  SDL_WINDOWPOS_CENTERED_DISPLAY(screen_index), screen_width, screen_height, flags);        
+    if(!window) {
+        printf("Could not create SDL window: %s\n", SDL_GetError());
+        exit(1);
+    }
+
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if(!renderer) {
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+    }
+
+    if(!renderer) {
+        printf("Could not create SDL renderer: %s\n", SDL_GetError());
+        exit(1);
+    }
+
     mapTexture = SDL_CreateTexture(renderer,
                                SDL_PIXELFORMAT_ARGB8888,
                                SDL_TEXTUREACCESS_TARGET,
                                screen_width, screen_height);
+    if(!mapTexture) {
+        printf("Could not create SDL map texture: %s\n", SDL_GetError());
+        exit(1);
+    }
 
     mapMoved = 1;
     mapTargetLon = 0;
@@ -283,39 +311,39 @@ void View::SDL_init() {
 //
 
 void View::drawStatusBox(int *left, int *top, std::string label, std::string message, SDL_Color color) {
-    int labelWidth = (label.length() + ((label.length() > 0 ) ? 1 : 0)) * labelFontWidth;
-    int messageWidth = (message.length() + ((message.length() > 0 ) ? 1 : 0)) * messageFontWidth;
+    int labelWidth = (label.length() + ((label.length() > 0 ) ? 1 : 0)) * statusFontWidth;
+    int messageWidth = (message.length() + ((message.length() > 0 ) ? 1 : 0)) * statusFontWidth;
 
     if(*left + labelWidth + messageWidth + PAD > screen_width) {
         *left = PAD;
-        *top = *top - messageFontHeight - PAD;
+        *top = *top - statusFontHeight - PAD;
     }
 
     // filled black background
     if(messageWidth) {
-        roundedBoxRGBA(renderer, *left, *top, *left + labelWidth + messageWidth, *top + messageFontHeight, ROUND_RADIUS, style.buttonBackground.r, style.buttonBackground.g, style.buttonBackground.b, SDL_ALPHA_OPAQUE);
+        roundedBoxRGBA(renderer, *left, *top, *left + labelWidth + messageWidth, *top + statusFontHeight, ROUND_RADIUS, style.buttonBackground.r, style.buttonBackground.g, style.buttonBackground.b, SDL_ALPHA_OPAQUE);
     }
 
     // filled label box
     if(labelWidth) {
-        roundedBoxRGBA(renderer, *left, *top, *left + labelWidth, *top + messageFontHeight, ROUND_RADIUS,color.r, color.g, color.b, SDL_ALPHA_OPAQUE);
+        roundedBoxRGBA(renderer, *left, *top, *left + labelWidth, *top + statusFontHeight, ROUND_RADIUS,color.r, color.g, color.b, SDL_ALPHA_OPAQUE);
     }
 
     // outline message box
     if(messageWidth) {
-        roundedRectangleRGBA(renderer, *left, *top, *left + labelWidth + messageWidth, *top + messageFontHeight, ROUND_RADIUS,color.r, color.g, color.b, SDL_ALPHA_OPAQUE);
+        roundedRectangleRGBA(renderer, *left, *top, *left + labelWidth + messageWidth, *top + statusFontHeight, ROUND_RADIUS,color.r, color.g, color.b, SDL_ALPHA_OPAQUE);
     }
 
     Label currentLabel;
-    currentLabel.setFont(labelFont);
+    currentLabel.setFont(statusFont);
     currentLabel.setColor(style.buttonBackground);
-    currentLabel.setPosition(*left + labelFontWidth/2, *top);
+    currentLabel.setPosition(*left + statusFontWidth/2, *top);
     currentLabel.setText(label);
     currentLabel.draw(renderer);
-    
-    currentLabel.setFont(messageFont);
+
+    currentLabel.setFont(statusFont);
     currentLabel.setColor(color);
-    currentLabel.setPosition(*left + labelWidth + messageFontWidth/2, *top);
+    currentLabel.setPosition(*left + labelWidth + statusFontWidth/2, *top);
     currentLabel.setText(message);
     currentLabel.draw(renderer);
 
@@ -324,11 +352,11 @@ void View::drawStatusBox(int *left, int *top, std::string label, std::string mes
 
 void View::drawCenteredStatusBox(std::string label, std::string message, SDL_Color color) {
 
-    int labelWidth = (label.length() + ((label.length() > 0 ) ? 1 : 0)) * labelFontWidth;
-    int messageWidth = (message.length() + ((message.length() > 0 ) ? 1 : 0)) * messageFontWidth;
+    int labelWidth = (label.length() + ((label.length() > 0 ) ? 1 : 0)) * statusFontWidth;
+    int messageWidth = (message.length() + ((message.length() > 0 ) ? 1 : 0)) * statusFontWidth;
 
     int left = (screen_width - (labelWidth + messageWidth)) / 2;
-    int top = (screen_height - labelFontHeight) / 2;
+    int top = (screen_height - statusFontHeight) / 2;
 	
     drawStatusBox(&left, &top, label, message, color);
 }
@@ -337,7 +365,7 @@ void View::drawCenteredStatusBox(std::string label, std::string message, SDL_Col
 void View::drawStatus() {
 
     int left = PAD; 
-    int top = screen_height - messageFontHeight - PAD;
+    int top = screen_height - statusFontHeight - PAD;
 
     if(fps) {
         char fps[60] = " ";
@@ -438,12 +466,12 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
 
 void View::drawPlaneIcon(int x, int y, float heading, SDL_Color planeColor)
 {
-    float body = 8.0 * screen_uiscale;
-    float wing = 6.0 * screen_uiscale;
+    float body = 8.0 * screen_uiscale * plane_scale;
+    float wing = 6.0 * screen_uiscale * plane_scale;
     float wingThick = 0.5;
-    float tail = 3.0 * screen_uiscale;
+    float tail = 3.0 * screen_uiscale * plane_scale;
     float tailThick = 0.35;
-    float bodyWidth = screen_uiscale;
+    float bodyWidth = screen_uiscale * plane_scale;
 
     float vec[3];
     vec[0] = sin(heading * M_PI / 180);
@@ -800,9 +828,171 @@ void View::drawGeography() {
     }
 }
 
+static SDL_Color weatherColorForIntensity(int intensity) {
+    if(intensity >= 4) {
+        return {198, 42, 198, 150};
+    }
+
+    if(intensity == 3) {
+        return {220, 55, 42, 135};
+    }
+
+    if(intensity == 2) {
+        return {230, 205, 38, 115};
+    }
+
+    return {0, 170, 90, 90};
+}
+
+void View::loadWeatherTiles() {
+    if(weather_file.empty()) {
+        return;
+    }
+
+    if(lastWeatherLoad.time_since_epoch().count() != 0 && elapsed_s(lastWeatherLoad) < 30.0f) {
+        return;
+    }
+    lastWeatherLoad = now();
+
+    std::ifstream infile(weather_file.c_str());
+    if(!infile) {
+        return;
+    }
+
+    std::vector<WeatherTile> loaded_tiles;
+    std::string line;
+
+    while(std::getline(infile, line)) {
+        if(line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::replace(line.begin(), line.end(), ',', ' ');
+        std::istringstream iss(line);
+        WeatherTile tile;
+        if(!(iss >> tile.lat_min >> tile.lon_min >> tile.lat_max >> tile.lon_max >> tile.intensity)) {
+            continue;
+        }
+
+        if(tile.intensity < 1 || tile.intensity > 4) {
+            continue;
+        }
+
+        if(tile.lat_min > tile.lat_max) {
+            std::swap(tile.lat_min, tile.lat_max);
+        }
+
+        if(tile.lon_min > tile.lon_max) {
+            std::swap(tile.lon_min, tile.lon_max);
+        }
+
+        loaded_tiles.push_back(tile);
+    }
+
+    weather_tiles.swap(loaded_tiles);
+}
+
+void View::updateSimulatedWeatherTiles() {
+    weather_tiles.clear();
+
+    float cycle = fmod(elapsed_s(weatherStartTime), 240.0f) / 240.0f;
+    float baseLat = appData->modes.fUserLat ? appData->modes.fUserLat : centerLat;
+    float baseLon = appData->modes.fUserLon ? appData->modes.fUserLon : centerLon;
+    float stormLon = baseLon - 0.35f + cycle * 0.7f;
+    float stormLat = baseLat + 0.04f * sin(cycle * 2.0f * M_PI);
+    float cellDeg = 0.025f;
+
+    for(int y = -12; y <= 12; y++) {
+        for(int x = -16; x <= 16; x++) {
+            float lon = stormLon + x * cellDeg;
+            float lat = stormLat + y * cellDeg;
+            float nx = (x + 0.25f * y) / 10.0f;
+            float ny = y / 7.5f;
+            float band = expf(-(nx * nx + ny * ny));
+            float embedded = expf(-(((x - 2.0f) * (x - 2.0f)) / 18.0f + ((y + 1.0f) * (y + 1.0f)) / 10.0f));
+            float trailing = 0.45f * expf(-(((x + 8.0f) * (x + 8.0f)) / 30.0f + ((y - 4.0f) * (y - 4.0f)) / 12.0f));
+            float value = band + embedded + trailing;
+
+            int intensity = 0;
+            if(value > 1.45f) {
+                intensity = 4;
+            } else if(value > 1.05f) {
+                intensity = 3;
+            } else if(value > 0.62f) {
+                intensity = 2;
+            } else if(value > 0.28f) {
+                intensity = 1;
+            }
+
+            if(intensity == 0) {
+                continue;
+            }
+
+            WeatherTile tile;
+            tile.lat_min = lat - cellDeg * 0.5f;
+            tile.lat_max = lat + cellDeg * 0.5f;
+            tile.lon_min = lon - cellDeg * 0.5f;
+            tile.lon_max = lon + cellDeg * 0.5f;
+            tile.intensity = intensity;
+            weather_tiles.push_back(tile);
+        }
+    }
+}
+
+void View::drawWeatherTiles() {
+    for(std::vector<WeatherTile>::iterator tile = weather_tiles.begin(); tile != weather_tiles.end(); ++tile) {
+        float dx, dy;
+        int x1, y1, x2, y2, x3, y3, x4, y4;
+
+        pxFromLonLat(&dx, &dy, tile->lon_min, tile->lat_min);
+        screenCoords(&x1, &y1, dx, dy);
+        pxFromLonLat(&dx, &dy, tile->lon_max, tile->lat_min);
+        screenCoords(&x2, &y2, dx, dy);
+        pxFromLonLat(&dx, &dy, tile->lon_max, tile->lat_max);
+        screenCoords(&x3, &y3, dx, dy);
+        pxFromLonLat(&dx, &dy, tile->lon_min, tile->lat_max);
+        screenCoords(&x4, &y4, dx, dy);
+
+        if(outOfBounds(x1, y1) && outOfBounds(x2, y2) && outOfBounds(x3, y3) && outOfBounds(x4, y4)) {
+            continue;
+        }
+
+        Sint16 vx[4] = {
+            static_cast<Sint16>(x1),
+            static_cast<Sint16>(x2),
+            static_cast<Sint16>(x3),
+            static_cast<Sint16>(x4)
+        };
+        Sint16 vy[4] = {
+            static_cast<Sint16>(y1),
+            static_cast<Sint16>(y2),
+            static_cast<Sint16>(y3),
+            static_cast<Sint16>(y4)
+        };
+        SDL_Color color = weatherColorForIntensity(tile->intensity);
+
+        filledPolygonRGBA(renderer, vx, vy, 4, color.r, color.g, color.b, color.a);
+        polygonRGBA(renderer, vx, vy, 4, color.r, color.g, color.b, static_cast<Uint8>(std::min(255, color.a + 35)));
+    }
+}
+
+void View::drawWeatherOverlay() {
+    if(simulate_weather) {
+        updateSimulatedWeatherTiles();
+    } else {
+        loadWeatherTiles();
+    }
+
+    if(weather_tiles.empty()) {
+        return;
+    }
+
+    drawWeatherTiles();
+}
+
 void View::drawPlaneText(Aircraft *p) {
     if(!p->label) {
-        p->label = new AircraftLabel(p,metric,screen_width, screen_height, mapFont);
+        p->label = new AircraftLabel(p,metric,screen_width, screen_height, labelFont, style);
     }
 
     p->label->update();
@@ -1167,6 +1357,7 @@ void View::draw() {
     zoomMapToTarget();
 
     drawGeography();
+    drawWeatherOverlay();
     drawScaleBars();
 
     if(appData->connected) {
@@ -1189,6 +1380,35 @@ void View::draw() {
     lastFrameTime = elapsed(drawStartTime); 
 }
 
+bool View::setTheme(std::string themeName) {
+    bool ok = style.setTheme(themeName);
+    if(ok) {
+        light_mode = themeName == "light";
+        mapRedraw = 1;
+    }
+    return ok;
+}
+
+void View::toggleLightMode() {
+    light_mode = !light_mode;
+    style.setTheme(light_mode ? "light" : "atc");
+
+    Aircraft *p = appData->aircraftList.head;
+    while(p) {
+        if(p->label) {
+            p->label->setStyle(style);
+        }
+        p = p->next;
+    }
+
+    mapRedraw = 1;
+}
+
+void View::startMapLoad() {
+    std::thread t1(&Map::load, &map);
+    t1.detach();
+}
+
 View::View(AppData *appData){
     this->appData = appData;
 
@@ -1199,13 +1419,32 @@ View::View(AppData *appData){
     screen_width            = 0;
     screen_height           = 0;    
     screen_depth            = 32;
+    plane_scale             = 1.0f;
+    label_scale             = 1.0f;
+    status_scale            = 1.0f;
+    simulate_weather        = false;
+    weather_file            = "";
+    light_mode              = false;
     metric                  = 0;
     fps                     = 0;
     fullscreen              = 0;
-    screen_index              = 0;
+    screen_index            = 0;
+    screen_upscale          = 1;
+
+    window                  = NULL;
+    renderer                = NULL;
+    mapTexture              = NULL;
+    mapFont                 = NULL;
+    mapBoldFont             = NULL;
+    listFont                = NULL;
+    messageFont             = NULL;
+    labelFont               = NULL;
+    statusFont              = NULL;
 
     highFramerate = false;
     lastFrameTime = 0;
+    weatherStartTime = now();
+    lastWeatherLoad = std::chrono::high_resolution_clock::time_point();
 
     centerLon   = 0;
     centerLat   = 0;
@@ -1217,8 +1456,6 @@ View::View(AppData *appData){
 
     selectedAircraft =  NULL;
 
-    std::thread t1(&Map::load, &map);
-    t1.detach();
 }
 
 View::~View() {
@@ -1226,7 +1463,20 @@ View::~View() {
     closeFont(mapBoldFont);
     closeFont(messageFont);
     closeFont(labelFont);
+    closeFont(statusFont);
     closeFont(listFont);
+
+    if(mapTexture) {
+        SDL_DestroyTexture(mapTexture);
+    }
+
+    if(renderer) {
+        SDL_DestroyRenderer(renderer);
+    }
+
+    if(window) {
+        SDL_DestroyWindow(window);
+    }
 
     TTF_Quit();
     SDL_Quit();

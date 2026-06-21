@@ -31,6 +31,10 @@
 
 #include "AppData.h"
 
+static std::chrono::steady_clock::time_point monotonicNow() {
+    return std::chrono::steady_clock::now();
+}
+
 //
 //carried over from view1090.c
 //
@@ -67,13 +71,27 @@ void AppData::connect() {
         return;
     }
 
-    c = (struct client *) malloc(sizeof(*c));
+    std::chrono::steady_clock::time_point now = monotonicNow();
+    if(lastConnectAttempt.time_since_epoch().count() != 0 &&
+       std::chrono::duration_cast<std::chrono::milliseconds>(now - lastConnectAttempt).count() < 1000) {
+        return;
+    }
+    lastConnectAttempt = now;
 
-    if ((fd = setupConnection(c)) == ANET_ERR) {
+    struct client *newClient = (struct client *) malloc(sizeof(*newClient));
+    if(!newClient) {
+        fprintf(stderr, "Out of memory allocating network client.\n");
+        exit(1);
+    }
+
+    if ((fd = setupConnection(newClient)) == ANET_ERR) {
+        free(newClient);
+        c = NULL;
         fprintf(stderr, "Waiting on %s:%d\n", server, modes.net_input_beast_port);     
         return;
     } 
 
+    c = newClient;
     connected = true;
     fprintf(stderr, "Connected to %s:%d\n", server, modes.net_input_beast_port);     
 }
@@ -82,6 +100,12 @@ void AppData::connect() {
 void AppData::disconnect() {
     if (fd != ANET_ERR) 
       {close(fd);}
+    fd = ANET_ERR;
+    if(c) {
+        free(c);
+        c = NULL;
+    }
+    connected = false;
 }
 
 
@@ -93,9 +117,8 @@ void AppData::update() {
     if ((fd == ANET_ERR) || (recv(c->fd, pk_buf, sizeof(pk_buf), MSG_PEEK | MSG_DONTWAIT) == 0)) {
         connected = false;
         free(c);
-        usleep(1000000);
-        c = (struct client *) malloc(sizeof(*c));
-        fd = setupConnection(c);
+        c = NULL;
+        fd = ANET_ERR;
         return;
     }
     char empty;
@@ -142,7 +165,7 @@ void AppData::updateStatus() {
      }
 
      msgRate                = msgRateAccumulate;
-     avgSig                 = sigAccumulate / (double) totalCount;
+     avgSig                 = totalCount ? sigAccumulate / (double) totalCount : 0.0;
      numPlanes              = totalCount;
      numVisiblePlanes       = numVisiblePlanes;
      maxDist                = maxDist;
@@ -152,6 +175,8 @@ void AppData::updateStatus() {
 AppData::AppData(){
     memset(&modes,    0, sizeof(Modes));
 
+    c = NULL;
+    fd = ANET_ERR;
     modes.check_crc               = 1;
     strcpy(server,"127.0.0.1"); 
     modes.net_input_beast_port    = MODES_NET_OUTPUT_BEAST_PORT;
@@ -165,4 +190,12 @@ AppData::AppData(){
     modes.quiet                   = 1;
 
     connected = false;
+    numVisiblePlanes = 0;
+    numPlanes = 0;
+    maxDist = 0.0;
+    totalCount = 0;
+    avgSig = 0.0;
+    sigAccumulate = 0.0;
+    msgRate = 0.0;
+    msgRateAccumulate = 0.0;
 }

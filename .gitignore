@@ -5,6 +5,8 @@
 *.swp
 .~
 thumbs.db
+__pycache__/
+*.pyc
 
 *.shp
 *.shp*
@@ -23,5 +25,8 @@ thumbs.db
 airportnames
 mapnames
 
+mapdata/cache/
+mapdata/work/
 
 viz1090
+tests/core_tests

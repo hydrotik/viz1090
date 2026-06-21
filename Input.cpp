@@ -47,6 +47,27 @@ template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
+static void zoom(View *view, float factor) {
+    view->maxDist *= factor;
+    if(view->maxDist < 0.001f) {
+        view->maxDist = 0.001f;
+    }
+
+    view->mapTargetMaxDist = 0;
+    view->mapMoved = 1;
+    view->highFramerate = true;
+}
+
+static void recenter(View *view, AppData *appData) {
+    view->centerLat = appData->modes.fUserLat;
+    view->centerLon = appData->modes.fUserLon;
+    view->mapTargetLat = 0;
+    view->mapTargetLon = 0;
+    view->mapTargetMaxDist = 0;
+    view->mapMoved = 1;
+    view->highFramerate = true;
+}
+
 void Input::getInput()
 {
 	SDL_Event event;
@@ -66,24 +87,50 @@ void Input::getInput()
 						exit(0);
 					break;
 
-					case SDLK_MINUS:
-                        view->maxDist *= 1.0 + 0.5 * sgn(1);
-                        if(view->maxDist < 0.001f) {
-                                view->maxDist = 0.001f;
-                        }
+                    case SDLK_UP:
+                    case SDLK_w:
+                    case SDLK_k:
+                        view->moveCenterRelative(0, -0.12f * view->screen_height);
+                    break;
 
-                        view->mapTargetMaxDist = 0;
-                        view->mapMoved = 1;
+                    case SDLK_DOWN:
+                    case SDLK_s:
+                    case SDLK_j:
+                        view->moveCenterRelative(0, 0.12f * view->screen_height);
+                    break;
+
+                    case SDLK_LEFT:
+                    case SDLK_a:
+                    case SDLK_h:
+                        view->moveCenterRelative(0.12f * view->screen_width, 0);
+                    break;
+
+                    case SDLK_RIGHT:
+                    case SDLK_d:
+                    case SDLK_l:
+                        view->moveCenterRelative(-0.12f * view->screen_width, 0);
+                    break;
+
+                    case SDLK_HOME:
+                    case SDLK_r:
+                        recenter(view, appData);
+                    break;
+
+                    case SDLK_t:
+                        view->toggleLightMode();
+                    break;
+
+					case SDLK_MINUS:
+                    case SDLK_KP_MINUS:
+                    case SDLK_PAGEDOWN:
+                        zoom(view, 1.5f);
     				break;
 
     				case SDLK_EQUALS:
-                        view->maxDist *= 1.0 + 0.5 * sgn(-1);
-                        if(view->maxDist < 0.001f) {
-                                view->maxDist = 0.001f;
-                        }
-
-                        view->mapTargetMaxDist = 0;
-                        view->mapMoved = 1;
+                    case SDLK_PLUS:
+                    case SDLK_KP_PLUS:
+                    case SDLK_PAGEUP:
+                        zoom(view, 0.5f);
     				break;
 
 					default:
@@ -93,13 +140,7 @@ void Input::getInput()
 			break;
 
 			case SDL_MOUSEWHEEL:
-				view->maxDist *= 1.0 + 0.5 * sgn(event.wheel.y);
-				if(view->maxDist < 0.001f) {
-					view->maxDist = 0.001f;
-				}
-
-				view->mapTargetMaxDist = 0;
-				view->mapMoved = 1;
+				zoom(view, 1.0 + 0.5 * sgn(event.wheel.y));
 				break;
 
 			case SDL_MULTIGESTURE:
@@ -183,8 +224,6 @@ Input::Input(AppData *appData, View *view) {
 	this->view = view;
 	this->appData = appData;
 }
-
-
 
 
 

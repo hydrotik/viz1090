@@ -30,7 +30,7 @@
 //
 
 #include "Aircraft.h"
-#include "AircraftLabel.h"
+#include <cstring>
 
 float Aircraft::getLastLon() {
 	if(lonHistory.size() > 1) {
@@ -55,14 +55,29 @@ float Aircraft::getLastHeading() {
 
 Aircraft::Aircraft(uint32_t addr) {
     this->addr = addr;
+    memset(flight, 0, sizeof(flight));
+    memset(signalLevel, 0, sizeof(signalLevel));
     prev_seen = 0;
+    seen = 0;
+    seenLatLon = 0;
 
     lon = 0;
     lat = 0;
+    messageRate = 0.0f;
+    altitude = 0;
+    speed = 0;
+    track = 0;
+    vert_rate = 0;
 
     label = NULL;
 
     next = NULL;
+    created = std::chrono::high_resolution_clock::time_point();
+    msSeen = std::chrono::high_resolution_clock::time_point();
+    msSeenLatLon = std::chrono::high_resolution_clock::time_point();
+    live = 0;
+    x = 0;
+    y = 0;
 }
 
 

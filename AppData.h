@@ -34,6 +34,7 @@
 
 #include "AircraftList.h"
 #include "dump1090.h"
+#include <chrono>
 
 class AppData {
 	private:
@@ -46,6 +47,7 @@ class AppData {
 	    struct client *c;
 	    int fd;
         char pk_buf[8];
+        std::chrono::steady_clock::time_point lastConnectAttempt;
 
 	public:
 		void initialize();
@@ -60,7 +62,7 @@ class AppData {
 		AircraftList aircraftList;
 		Modes modes;
 
-		char server[32];
+		char server[256];
 
 	    int numVisiblePlanes;
 	    int numPlanes;
