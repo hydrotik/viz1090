@@ -156,8 +156,14 @@ uConsole-friendly controls:
 - Arrow keys, WASD, or HJKL pan the map.
 - `+`, keypad `+`, or PageUp zoom in.
 - `-`, keypad `-`, or PageDown zoom out.
+- uConsole D-pad/controller arrows pan when exposed through SDL as controller or joystick input.
+- uConsole `X` or `R` zooms in when exposed as controller buttons.
+- uConsole `Y` or `L` zooms out when exposed as controller buttons.
+- uConsole `A` recenters and `B` toggles dark/light mode when exposed as controller buttons.
 - Home or `r` recenters on the configured latitude/longitude.
 - `t` toggles between ATC dark mode and light mode.
+
+If a physical uConsole key does not behave as expected, run `./run_uconsole.sh --debug-input` and press that key. The terminal will print whether SDL sees it as a keyboard key, mouse button, controller button, joystick button, or hat/D-pad event.
 
 ### uConsole GPS and Weather
 

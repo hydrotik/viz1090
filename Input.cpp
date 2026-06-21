@@ -31,6 +31,13 @@
 
 #include "Input.h"
 
+#include <cstdio>
+#include <vector>
+
+static std::vector<SDL_GameController *> gameControllers;
+static std::vector<SDL_Joystick *> joysticks;
+static std::vector<SDL_JoystickID> gameControllerJoystickIds;
+
 static std::chrono::high_resolution_clock::time_point now() {
     return std::chrono::high_resolution_clock::now();
 }
@@ -68,6 +75,104 @@ static void recenter(View *view, AppData *appData) {
     view->highFramerate = true;
 }
 
+static void pan(View *view, float dx, float dy) {
+    view->moveCenterRelative(dx, dy);
+}
+
+static void handleControllerButton(Input *input, int button) {
+    switch(button) {
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:
+            pan(input->view, 0, -0.12f * input->view->screen_height);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+            pan(input->view, 0, 0.12f * input->view->screen_height);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+            pan(input->view, 0.12f * input->view->screen_width, 0);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+            pan(input->view, -0.12f * input->view->screen_width, 0);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+        case SDL_CONTROLLER_BUTTON_X:
+            zoom(input->view, 0.5f);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+        case SDL_CONTROLLER_BUTTON_Y:
+            zoom(input->view, 1.5f);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_A:
+            recenter(input->view, input->appData);
+        break;
+
+        case SDL_CONTROLLER_BUTTON_B:
+            input->view->toggleLightMode();
+        break;
+
+        default:
+        break;
+    }
+}
+
+static void handleJoystickButton(Input *input, int button) {
+    switch(button) {
+        case 0:
+            recenter(input->view, input->appData);
+        break;
+
+        case 1:
+            input->view->toggleLightMode();
+        break;
+
+        case 2:
+        case 5:
+            zoom(input->view, 0.5f);
+        break;
+
+        case 3:
+        case 4:
+            zoom(input->view, 1.5f);
+        break;
+
+        default:
+        break;
+    }
+}
+
+static void handleJoystickHat(Input *input, Uint8 value) {
+    if(value & SDL_HAT_UP) {
+        pan(input->view, 0, -0.12f * input->view->screen_height);
+    }
+
+    if(value & SDL_HAT_DOWN) {
+        pan(input->view, 0, 0.12f * input->view->screen_height);
+    }
+
+    if(value & SDL_HAT_LEFT) {
+        pan(input->view, 0.12f * input->view->screen_width, 0);
+    }
+
+    if(value & SDL_HAT_RIGHT) {
+        pan(input->view, -0.12f * input->view->screen_width, 0);
+    }
+}
+
+static bool joystickInstanceIsGameController(SDL_JoystickID instanceId) {
+    for(std::vector<SDL_JoystickID>::iterator id = gameControllerJoystickIds.begin(); id != gameControllerJoystickIds.end(); ++id) {
+        if(*id == instanceId) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void Input::getInput()
 {
 	SDL_Event event;
@@ -81,6 +186,14 @@ void Input::getInput()
 			break;
 			
 			case SDL_KEYDOWN:
+                if(debugInput) {
+                    printf("input key sym=%s scancode=%s mod=%u repeat=%u\n",
+                        SDL_GetKeyName(event.key.keysym.sym),
+                        SDL_GetScancodeName(event.key.keysym.scancode),
+                        event.key.keysym.mod,
+                        event.key.repeat);
+                }
+
 				switch (event.key.keysym.sym)
 				{
 					case SDLK_ESCAPE:
@@ -139,7 +252,45 @@ void Input::getInput()
 
 			break;
 
+            case SDL_CONTROLLERBUTTONDOWN:
+                if(debugInput) {
+                    printf("input controller button=%s index=%d\n",
+                        SDL_GameControllerGetStringForButton(static_cast<SDL_GameControllerButton>(event.cbutton.button)),
+                        event.cbutton.button);
+                }
+
+                handleControllerButton(this, event.cbutton.button);
+            break;
+
+            case SDL_JOYBUTTONDOWN:
+                if(joystickInstanceIsGameController(event.jbutton.which)) {
+                    break;
+                }
+
+                if(debugInput) {
+                    printf("input joystick button joy=%d button=%d\n", static_cast<int>(event.jbutton.which), event.jbutton.button);
+                }
+
+                handleJoystickButton(this, event.jbutton.button);
+            break;
+
+            case SDL_JOYHATMOTION:
+                if(joystickInstanceIsGameController(event.jhat.which)) {
+                    break;
+                }
+
+                if(debugInput) {
+                    printf("input joystick hat joy=%d hat=%d value=%u\n", static_cast<int>(event.jhat.which), event.jhat.hat, event.jhat.value);
+                }
+
+                handleJoystickHat(this, event.jhat.value);
+            break;
+
 			case SDL_MOUSEWHEEL:
+                if(debugInput) {
+                    printf("input mouse wheel x=%d y=%d direction=%u\n", event.wheel.x, event.wheel.y, event.wheel.direction);
+                }
+
 				zoom(view, 1.0 + 0.5 * sgn(event.wheel.y));
 				break;
 
@@ -188,6 +339,15 @@ void Input::getInput()
 				break;
 
 			case SDL_MOUSEBUTTONDOWN:
+                if(debugInput) {
+                    printf("input mouse down which=%u button=%u clicks=%u x=%d y=%d\n",
+                        event.button.which,
+                        event.button.button,
+                        event.button.clicks,
+                        event.button.x,
+                        event.button.y);
+                }
+
 				if(event.button.which != SDL_TOUCH_MOUSEID) {
 					if(elapsed(touchDownTime) > 500) {
 						tapCount = 0;
@@ -197,6 +357,15 @@ void Input::getInput()
 				break;
 
 			case SDL_MOUSEBUTTONUP:;
+                if(debugInput) {
+                    printf("input mouse up which=%u button=%u clicks=%u x=%d y=%d\n",
+                        event.button.which,
+                        event.button.button,
+                        event.button.clicks,
+                        event.button.x,
+                        event.button.y);
+                }
+
 				if(event.button.which != SDL_TOUCH_MOUSEID) {
 					touchx = event.motion.x;
 					touchy = event.motion.y;
@@ -223,9 +392,30 @@ void Input::getInput()
 Input::Input(AppData *appData, View *view) {
 	this->view = view;
 	this->appData = appData;
+    this->debugInput = false;
+
+    SDL_GameControllerEventState(SDL_ENABLE);
+    SDL_JoystickEventState(SDL_ENABLE);
+
+    int joystickCount = SDL_NumJoysticks();
+    for(int i = 0; i < joystickCount; i++) {
+        if(SDL_IsGameController(i)) {
+            SDL_GameController *controller = SDL_GameControllerOpen(i);
+            if(controller) {
+                gameControllers.push_back(controller);
+                SDL_Joystick *joystick = SDL_GameControllerGetJoystick(controller);
+                if(joystick) {
+                    gameControllerJoystickIds.push_back(SDL_JoystickInstanceID(joystick));
+                }
+            }
+        } else {
+            SDL_Joystick *joystick = SDL_JoystickOpen(i);
+            if(joystick) {
+                joysticks.push_back(joystick);
+            }
+        }
+    }
 }
-
-
 
 
 

@@ -157,8 +157,12 @@ uConsole input support:
 - Arrow keys, WASD, and HJKL pan.
 - `+`, keypad `+`, and PageUp zoom in.
 - `-`, keypad `-`, and PageDown zoom out.
+- uConsole controller/D-pad events pan when SDL exposes the top arrow controls as controller or joystick hat input.
+- uConsole `X`/`R` zoom in, `Y`/`L` zoom out, `A` recenters, and `B` toggles dark/light mode when SDL exposes those buttons as controller input. Raw joystick fallback maps button indices `0=A`, `1=B`, `2=X`, `3=Y`, `4=L`, `5=R`.
 - Home or `r` recenters on the configured latitude/longitude.
 - `t` toggles between ATC dark mode and light mode.
+
+Use `./run_uconsole.sh --debug-input` to print SDL input events when validating the physical uConsole keys. This is especially useful because some uConsole controls may appear as mouse buttons instead of keyboard/controller buttons; observed behavior included the `L` control acting like a left click/double click.
 
 After one successful online run, the same map can be regenerated without network:
 

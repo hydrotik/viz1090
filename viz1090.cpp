@@ -54,6 +54,7 @@ void showHelp(void) {
 "--fps                            Show current framerate\n"
 "--fullscreen                     Start fullscreen\n"
 "--help                           Show this help\n"
+"--debug-input                    Print SDL input events to stdout\n"
 "--lat <latitude>                 Latitude in degrees\n"
 "--label-scale <factor>           Aircraft label scaling (default: 1.0)\n"
 "--lon <longitude>                Longitude in degrees\n"
@@ -114,6 +115,7 @@ int main(int argc, char **argv) {
   
     AppData appData;
     View view(&appData);
+    bool debugInput = false;
     
     // Parse the command line options
     for (int j = 1; j < argc; j++) {
@@ -178,6 +180,8 @@ int main(int argc, char **argv) {
             }
         } else if (!strcmp(argv[j],"--fps")) {
             view.fps = 1;
+        } else if (!strcmp(argv[j],"--debug-input")) {
+            debugInput = true;
         } else if (!strcmp(argv[j],"--fullscreen")) {
             view.fullscreen = 1;
         } else if (!strcmp(argv[j],"--simulate-weather")) {
@@ -230,6 +234,7 @@ int main(int argc, char **argv) {
     view.font_init();
 
     Input input(&appData,&view);
+    input.debugInput = debugInput;
 
     signal(SIGINT, SIG_DFL);  // reset signal handler - bit extra safety
 

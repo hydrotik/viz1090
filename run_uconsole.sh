@@ -22,6 +22,7 @@ ROADS=1
 SIMULATE_WEATHER=0
 REGEN_MAP=0
 SKIP_MAP=0
+DEBUG_INPUT=0
 EXTRA_ARGS=()
 
 usage() {
@@ -50,6 +51,7 @@ Options:
   --label-scale <n>   Aircraft label scale. Default: 1.9
   --status-scale <n>  Bottom status text scale. Default: 1.8
   --simulate-weather  Draw a simulated radar storm cell.
+  --debug-input       Print SDL input events to stdout.
   --tolerance <value> Map simplification tolerance. Default: 0.0001
   --minpop <value>    Minimum city population label. Default: 50000
   --no-roads          Do not include roads in regenerated map data.
@@ -131,6 +133,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --simulate-weather)
             SIMULATE_WEATHER=1
+            shift
+            ;;
+        --debug-input)
+            DEBUG_INPUT=1
             shift
             ;;
         --tolerance)
@@ -262,6 +268,10 @@ if [[ "${SIMULATE_WEATHER}" -eq 1 ]]; then
     viz_args+=(--simulate-weather)
 elif [[ -s "${WEATHER_FILE}" ]]; then
     viz_args+=(--weather-file "${WEATHER_FILE}")
+fi
+
+if [[ "${DEBUG_INPUT}" -eq 1 ]]; then
+    viz_args+=(--debug-input)
 fi
 
 exec ./viz1090 "${viz_args[@]}" "${EXTRA_ARGS[@]}"

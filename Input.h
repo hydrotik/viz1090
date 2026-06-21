@@ -46,6 +46,7 @@ public:
 
 	View *view;
 	AppData *appData;
+    bool debugInput;
 
 	std::chrono::high_resolution_clock::time_point touchDownTime;
     int touchx;
