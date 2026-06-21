@@ -92,12 +92,29 @@ WORK_DIR="${DATA_DIR}/work"
 mkdir -p "${CACHE_DIR}" "${WORK_DIR}" "${OUTPUT_DIR}"
 rm -rf "${WORK_DIR:?}/"*
 
+cache_file_valid() {
+    local filename="$1"
+    local path="$2"
+
+    if [[ ! -s "${path}" ]]; then
+        return 1
+    fi
+
+    if [[ "${filename}" == *.zip ]]; then
+        unzip -tq "${path}" >/dev/null 2>&1
+        return
+    fi
+
+    return 0
+}
+
 download_source() {
     local filename="$1"
     local url="$2"
     local output="${CACHE_DIR}/${filename}"
+    local partial="${output}.partial"
 
-    if [[ -f "${output}" && "${FORCE_DOWNLOAD}" -eq 0 ]]; then
+    if [[ -f "${output}" && "${FORCE_DOWNLOAD}" -eq 0 ]] && cache_file_valid "${filename}" "${output}"; then
         echo "Using cached ${filename}"
         return
     fi
@@ -108,15 +125,30 @@ download_source() {
     fi
 
     echo "Downloading ${filename}"
-    wget --no-verbose -O "${output}" "${url}"
+    rm -f "${partial}"
+    if wget --tries=3 --timeout=20 --no-verbose -O "${partial}" "${url}"; then
+        mv "${partial}" "${output}"
+        return
+    fi
+
+    rm -f "${partial}"
+    if [[ -f "${output}" ]] && cache_file_valid "${filename}" "${output}"; then
+        echo "Download failed for ${filename}; using existing cached copy." >&2
+        return
+    fi
+
+    echo "Download failed for ${filename}, and no cached copy exists." >&2
+    echo "Reconnect the uConsole to the network and retry, or copy mapdata/cache from a machine that already has these files." >&2
+    exit 1
 }
 
 download_optional_source() {
     local filename="$1"
     local url="$2"
     local output="${CACHE_DIR}/${filename}"
+    local partial="${output}.partial"
 
-    if [[ -f "${output}" && "${FORCE_DOWNLOAD}" -eq 0 ]]; then
+    if [[ -f "${output}" && "${FORCE_DOWNLOAD}" -eq 0 ]] && cache_file_valid "${filename}" "${output}"; then
         echo "Using cached ${filename}"
         return 0
     fi
@@ -127,12 +159,19 @@ download_optional_source() {
     fi
 
     echo "Downloading optional ${filename}"
-    if wget --no-verbose -O "${output}" "${url}"; then
+    rm -f "${partial}"
+    if wget --tries=3 --timeout=20 --no-verbose -O "${partial}" "${url}"; then
+        mv "${partial}" "${output}"
         return 0
     fi
 
-    rm -f "${output}"
-    echo "Optional source ${filename} could not be downloaded; continuing without runway outlines." >&2
+    rm -f "${partial}"
+    if [[ -f "${output}" ]] && cache_file_valid "${filename}" "${output}"; then
+        echo "Optional source ${filename} could not be refreshed; using existing cached copy." >&2
+        return 0
+    fi
+
+    echo "Optional source ${filename} could not be downloaded; continuing without it." >&2
     return 1
 }
 

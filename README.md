@@ -102,6 +102,20 @@ On a ClockworkPi uConsole, the wrapper script builds if needed, generates this r
 ./run_uconsole.sh
 ```
 
+When syncing source code to the uConsole with `rsync --delete`, exclude local map data so offline caches and generated maps are not removed from the device:
+
+```
+rsync -av --delete \
+  --exclude .git/ \
+  --exclude __pycache__/ \
+  --exclude '*.o' \
+  --exclude viz1090 \
+  --exclude tests/core_tests \
+  --exclude mapdata/ \
+  ./ \
+  djdonovan@192.168.1.195:~/viz1090/
+```
+
 The wrapper tries to read GPS first, then falls back to configured coordinates. To skip GPS:
 
 ```

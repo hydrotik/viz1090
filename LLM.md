@@ -139,6 +139,8 @@ cd ~/viz1090
 
 `run_uconsole.sh` builds the binary when needed, generates `mapdata/generated/nyc` when missing, and launches with `--theme atc`, `--mapdir mapdata/generated/nyc`, `--screensize 1280 720`, and the observed coordinates. It tries to read GPS first via `tools/gps_fix.py`, then falls back to the configured/default `--lat` and `--lon`; use `--no-gps` to skip GPS. Its default map tolerance is `0.0001` for more local detail than the original `0.001`; use `--regen-map --tolerance 0.00005` for a denser local map if rendering remains fast enough. It defaults to `--plane-scale 1.5 --label-scale 1.9 --status-scale 1.8` so aircraft, aircraft labels, and the bottom status strip are readable on the uConsole's small high-resolution screen without doubling all UI.
 
+When syncing code from the Mac to the uConsole, keep `mapdata/` out of `rsync --delete` operations. `mapdata/cache` and `mapdata/generated` are device-local offline assets and should survive source updates unless intentionally regenerated.
+
 The generated vector map now combines state/province outlines, coastlines, local roads when a `--bbox` is provided, airport labels, and runway geometry. FAA runway outline downloads are optional; if that ArcGIS endpoint fails, `getmap.sh` falls back to OurAirports `runways.csv` and generates runway centerlines. The original admin-boundary-only map can look blank at a close 25 km New York zoom, so coastlines/roads/runways are important for a visible local map.
 
 Aircraft labels include heuristic category markers:
