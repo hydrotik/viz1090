@@ -957,6 +957,22 @@ void View::drawWeatherTiles() {
             continue;
         }
 
+        float cx = (x1 + x2 + x3 + x4) / 4.0f;
+        float cy = (y1 + y2 + y3 + y4) / 4.0f;
+        int *xs[4] = {&x1, &x2, &x3, &x4};
+        int *ys[4] = {&y1, &y2, &y3, &y4};
+
+        for(int i = 0; i < 4; i++) {
+            float vx = *xs[i] - cx;
+            float vy = *ys[i] - cy;
+            float len = sqrtf(vx * vx + vy * vy);
+
+            if(len > 0.0f) {
+                *xs[i] = static_cast<int>(roundf(cx + vx * ((len + 1.0f) / len)));
+                *ys[i] = static_cast<int>(roundf(cy + vy * ((len + 1.0f) / len)));
+            }
+        }
+
         Sint16 vx[4] = {
             static_cast<Sint16>(x1),
             static_cast<Sint16>(x2),
@@ -972,7 +988,6 @@ void View::drawWeatherTiles() {
         SDL_Color color = weatherColorForIntensity(tile->intensity);
 
         filledPolygonRGBA(renderer, vx, vy, 4, color.r, color.g, color.b, color.a);
-        polygonRGBA(renderer, vx, vy, 4, color.r, color.g, color.b, static_cast<Uint8>(std::min(255, color.a + 35)));
     }
 }
 
