@@ -31,11 +31,11 @@ Options:
   --tolerance <number>   Geometry simplification tolerance. Default: 0.001.
   --help                 Show this help.
 
-Example for Northeast US regional offline assets:
-  ./getmap.sh --output-dir mapdata/generated/northeast --bbox -82,36,-65,48.5 --roads --water --tolerance 0.00025 --minpop 25000
+Example for offline US assets:
+  ./getmap.sh --output-dir mapdata/generated/us --bbox -180,17,-52,72 --roads --water --tolerance 0.001 --minpop 100000
 
 Run viz1090 with:
-  ./viz1090 --mapdir mapdata/generated/northeast --theme atc --lat 40.723972 --lon -73.845139
+  ./viz1090 --mapdir mapdata/generated/us --theme atc --lat 40.723972 --lon -73.845139
 EOF
 }
 

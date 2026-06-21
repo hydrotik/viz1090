@@ -90,13 +90,13 @@ For portable/offline use, run the download once, then reuse the cached sources:
 ./getmap.sh --offline --output-dir mapdata/generated/default
 ```
 
-For a Northeast US regional map with enough coverage for zoomed-out uConsole use:
+For offline use across the United States, generate the national profile used by the uConsole wrapper:
 
 ```
-./getmap.sh --output-dir mapdata/generated/northeast --bbox -82,36,-65,48.5 --roads --water --tolerance 0.00025 --minpop 25000
+./getmap.sh --output-dir mapdata/generated/us --bbox -180,17,-52,72 --roads --water --tolerance 0.001 --minpop 100000
 ```
 
-On a ClockworkPi uConsole, the wrapper script builds if needed, generates this Northeast regional map if missing, and launches the app with the recommended 1280x720 fullscreen settings:
+On a ClockworkPi uConsole, the wrapper script builds if needed, generates this US map if missing, and launches the app with the recommended 1280x720 fullscreen settings:
 
 ```
 ./run_uconsole.sh
@@ -124,16 +124,18 @@ The wrapper tries to read GPS first, then falls back to configured coordinates. 
 
 On HackerGadgets AIO V2 boards, GPS power is GPIO-controlled; the wrapper tries to enable GPIO 27 with `pinctrl` before reading GPS. Indoor GPS often fails to fix, especially after a cold start, so falling back to configured coordinates is expected indoors.
 
-For a more detailed local map, regenerate with a lower simplification tolerance:
+The default `us` profile covers CONUS, Alaska, Hawaii, and Puerto Rico with one offline map. Far Pacific territories and the far western Aleutians require future multi-bbox/dateline-aware map generation.
+
+For a more detailed local map, use a smaller profile or lower simplification tolerance:
 
 ```
-./run_uconsole.sh --regen-map --tolerance 0.00005
+./run_uconsole.sh --map-profile conus --regen-map --tolerance 0.0005
 ```
 
-If you previously generated only the smaller NYC map, force the new larger Northeast map once:
+If you previously generated only the smaller NYC or Northeast map, force the new US map once:
 
 ```
-./run_uconsole.sh --regen-map
+./run_uconsole.sh --map-profile us --regen-map
 ```
 
 The uConsole wrapper also enlarges aircraft icons and aircraft labels by default. Tune those independently:
@@ -251,7 +253,7 @@ The bash script getmap.sh will download (so long as the links don't break) and c
 The generated map files can live outside the repository root. Use `--mapdir` when starting viz1090:
 
 ```
-./viz1090 --mapdir mapdata/generated/northeast --theme atc --lat 40.723972 --lon -73.845139
+./viz1090 --mapdir mapdata/generated/us --theme atc --lat 40.723972 --lon -73.845139
 ```
 
 ### MAPCONVERTER.PY RUNTIME OPTIONS

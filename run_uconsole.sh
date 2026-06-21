@@ -8,16 +8,17 @@ GPS_TIMEOUT="8"
 GPS_DEVICE=""
 GPS_POWER=1
 GPS_POWER_GPIO="27"
-BBOX="-82,36,-65,48.5"
-MAP_DIR="mapdata/generated/northeast"
+MAP_PROFILE="us"
+BBOX="-180,17,-52,72"
+MAP_DIR="mapdata/generated/us"
 WEATHER_FILE="weather/radar_tiles.csv"
 THEME="atc"
 UISCALE="1"
 PLANE_SCALE="1.5"
 LABEL_SCALE="1.9"
 STATUS_SCALE="1.8"
-TOLERANCE="0.00025"
-MINPOP="25000"
+TOLERANCE="0.001"
+MINPOP="100000"
 ROADS=1
 WATER=1
 SIMULATE_WEATHER=0
@@ -30,7 +31,7 @@ usage() {
     cat <<'EOF'
 Usage: ./run_uconsole.sh [options] [-- extra viz1090 args]
 
-Builds if needed, generates offline regional map data if missing, then starts
+Builds if needed, generates offline map data if missing, then starts
 viz1090 with uConsole-friendly defaults.
 
 Options:
@@ -43,8 +44,9 @@ Options:
   --gps-power-gpio <n> GPS enable GPIO. Default: 27
   --gps-device <path> Add a GPS serial device path to try.
   --gps-timeout <sec> GPS fix timeout. Default: 8
-  --bbox <bounds>     Map bbox lon_min,lat_min,lon_max,lat_max. Default: Northeast US.
-  --mapdir <path>     Generated map directory. Default: mapdata/generated/northeast
+  --map-profile <name> us, conus, northeast, or custom. Default: us
+  --bbox <bounds>     Map bbox lon_min,lat_min,lon_max,lat_max. Default: US profile.
+  --mapdir <path>     Generated map directory. Default: mapdata/generated/us
   --weather-file <path> Radar tile cache file. Default: weather/radar_tiles.csv
   --theme <name>      classic, atc, map, or light. Default: atc
   --uiscale <value>   UI scale. Default: 1
@@ -53,8 +55,8 @@ Options:
   --status-scale <n>  Bottom status text scale. Default: 1.8
   --simulate-weather  Draw a simulated radar storm cell.
   --debug-input       Print SDL input events to stdout.
-  --tolerance <value> Map simplification tolerance. Default: 0.00025
-  --minpop <value>    Minimum city population label. Default: 25000
+  --tolerance <value> Map simplification tolerance. Default: 0.001
+  --minpop <value>    Minimum city population label. Default: 100000
   --no-roads          Do not include roads in regenerated map data.
   --no-water          Do not include lakes/rivers in regenerated map data.
   --regen-map         Regenerate map data even when files already exist.
@@ -62,6 +64,44 @@ Options:
   --help              Show this help.
 EOF
 }
+
+apply_map_profile() {
+    case "${MAP_PROFILE}" in
+        us)
+            BBOX="-180,17,-52,72"
+            MAP_DIR="mapdata/generated/us"
+            TOLERANCE="0.001"
+            MINPOP="100000"
+            ROADS=1
+            WATER=1
+            ;;
+        conus)
+            BBOX="-125,24,-66,50"
+            MAP_DIR="mapdata/generated/conus"
+            TOLERANCE="0.00075"
+            MINPOP="50000"
+            ROADS=1
+            WATER=1
+            ;;
+        northeast)
+            BBOX="-82,36,-65,48.5"
+            MAP_DIR="mapdata/generated/northeast"
+            TOLERANCE="0.00025"
+            MINPOP="25000"
+            ROADS=1
+            WATER=1
+            ;;
+        custom)
+            ;;
+        *)
+            echo "Unknown map profile: ${MAP_PROFILE}" >&2
+            echo "Valid profiles: us, conus, northeast, custom" >&2
+            exit 1
+            ;;
+    esac
+}
+
+apply_map_profile
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -101,11 +141,18 @@ while [[ $# -gt 0 ]]; do
             GPS_TIMEOUT="$2"
             shift 2
             ;;
+        --map-profile)
+            MAP_PROFILE="$2"
+            apply_map_profile
+            shift 2
+            ;;
         --bbox)
+            MAP_PROFILE="custom"
             BBOX="$2"
             shift 2
             ;;
         --mapdir)
+            MAP_PROFILE="custom"
             MAP_DIR="$2"
             shift 2
             ;;
@@ -142,18 +189,22 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --tolerance)
+            MAP_PROFILE="custom"
             TOLERANCE="$2"
             shift 2
             ;;
         --minpop)
+            MAP_PROFILE="custom"
             MINPOP="$2"
             shift 2
             ;;
         --no-roads)
+            MAP_PROFILE="custom"
             ROADS=0
             shift
             ;;
         --no-water)
+            MAP_PROFILE="custom"
             WATER=0
             shift
             ;;
