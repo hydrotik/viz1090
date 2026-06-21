@@ -158,7 +158,8 @@ uConsole input support:
 - `+`, keypad `+`, and PageUp zoom in.
 - `-`, keypad `-`, and PageDown zoom out.
 - uConsole controller/D-pad events pan when SDL exposes the top arrow controls as controller or joystick hat input.
-- uConsole `X`/`R` zoom in, `Y`/`L` zoom out, `A` recenters, and `B` toggles dark/light mode when SDL exposes those buttons as controller input. Raw joystick fallback maps button indices `0=A`, `1=B`, `2=X`, `3=Y`, `4=L`, `5=R`.
+- Observed uConsole mapping on 2026-06-21: `X` is raw joystick button `0`, `A` is `1`, `B` is `2`, and `Y` is `3`. The app maps `X` zoom in, `Y` zoom out, `A` recenter, and `B` toggle dark/light mode.
+- Observed `L` is mouse button `1` at `(0,0)` and `R` is mouse button `3` at `(0,0)`. The app treats those synthetic origin mouse events as `L` zoom out and `R` zoom in instead of normal clicks.
 - Home or `r` recenters on the configured latitude/longitude.
 - `t` toggles between ATC dark mode and light mode.
 

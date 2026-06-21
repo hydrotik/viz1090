@@ -157,9 +157,8 @@ uConsole-friendly controls:
 - `+`, keypad `+`, or PageUp zoom in.
 - `-`, keypad `-`, or PageDown zoom out.
 - uConsole D-pad/controller arrows pan when exposed through SDL as controller or joystick input.
-- uConsole `X` or `R` zooms in when exposed as controller buttons.
-- uConsole `Y` or `L` zooms out when exposed as controller buttons.
-- uConsole `A` recenters and `B` toggles dark/light mode when exposed as controller buttons.
+- uConsole `X` zooms in, `Y` zooms out, `A` recenters, and `B` toggles dark/light mode when exposed as raw joystick buttons.
+- uConsole `L` zooms out and `R` zooms in when exposed as mouse buttons at `(0,0)`.
 - Home or `r` recenters on the configured latitude/longitude.
 - `t` toggles between ATC dark mode and light mode.
 

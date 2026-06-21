@@ -82,11 +82,11 @@ static void pan(View *view, float dx, float dy) {
 static void handleControllerButton(Input *input, int button) {
     switch(button) {
         case SDL_CONTROLLER_BUTTON_DPAD_UP:
-            pan(input->view, 0, -0.12f * input->view->screen_height);
+            pan(input->view, 0, 0.12f * input->view->screen_height);
         break;
 
         case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
-            pan(input->view, 0, 0.12f * input->view->screen_height);
+            pan(input->view, 0, -0.12f * input->view->screen_height);
         break;
 
         case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
@@ -123,21 +123,27 @@ static void handleControllerButton(Input *input, int button) {
 static void handleJoystickButton(Input *input, int button) {
     switch(button) {
         case 0:
-            recenter(input->view, input->appData);
-        break;
-
-        case 1:
-            input->view->toggleLightMode();
-        break;
-
-        case 2:
-        case 5:
             zoom(input->view, 0.5f);
         break;
 
+        case 1:
+            recenter(input->view, input->appData);
+        break;
+
+        case 2:
+            input->view->toggleLightMode();
+        break;
+
         case 3:
+            zoom(input->view, 1.5f);
+        break;
+
         case 4:
             zoom(input->view, 1.5f);
+        break;
+
+        case 5:
+            zoom(input->view, 0.5f);
         break;
 
         default:
@@ -147,11 +153,11 @@ static void handleJoystickButton(Input *input, int button) {
 
 static void handleJoystickHat(Input *input, Uint8 value) {
     if(value & SDL_HAT_UP) {
-        pan(input->view, 0, -0.12f * input->view->screen_height);
+        pan(input->view, 0, 0.12f * input->view->screen_height);
     }
 
     if(value & SDL_HAT_DOWN) {
-        pan(input->view, 0, 0.12f * input->view->screen_height);
+        pan(input->view, 0, -0.12f * input->view->screen_height);
     }
 
     if(value & SDL_HAT_LEFT) {
@@ -171,6 +177,19 @@ static bool joystickInstanceIsGameController(SDL_JoystickID instanceId) {
     }
 
     return false;
+}
+
+static bool isUConsoleShoulderMouseEvent(const SDL_MouseButtonEvent *button) {
+    return button->which == 0 && button->x == 0 && button->y == 0 &&
+        (button->button == SDL_BUTTON_LEFT || button->button == SDL_BUTTON_RIGHT);
+}
+
+static void handleUConsoleShoulderMouseEvent(Input *input, const SDL_MouseButtonEvent *button) {
+    if(button->button == SDL_BUTTON_LEFT) {
+        zoom(input->view, 1.5f);
+    } else if(button->button == SDL_BUTTON_RIGHT) {
+        zoom(input->view, 0.5f);
+    }
 }
 
 void Input::getInput()
@@ -203,13 +222,13 @@ void Input::getInput()
                     case SDLK_UP:
                     case SDLK_w:
                     case SDLK_k:
-                        view->moveCenterRelative(0, -0.12f * view->screen_height);
+                        view->moveCenterRelative(0, 0.12f * view->screen_height);
                     break;
 
                     case SDLK_DOWN:
                     case SDLK_s:
                     case SDLK_j:
-                        view->moveCenterRelative(0, 0.12f * view->screen_height);
+                        view->moveCenterRelative(0, -0.12f * view->screen_height);
                     break;
 
                     case SDLK_LEFT:
@@ -349,6 +368,10 @@ void Input::getInput()
                 }
 
 				if(event.button.which != SDL_TOUCH_MOUSEID) {
+                    if(isUConsoleShoulderMouseEvent(&event.button)) {
+                        break;
+                    }
+
 					if(elapsed(touchDownTime) > 500) {
 						tapCount = 0;
 					}
@@ -367,8 +390,13 @@ void Input::getInput()
                 }
 
 				if(event.button.which != SDL_TOUCH_MOUSEID) {
-					touchx = event.motion.x;
-					touchy = event.motion.y;
+                    if(isUConsoleShoulderMouseEvent(&event.button)) {
+                        handleUConsoleShoulderMouseEvent(this, &event.button);
+                        break;
+                    }
+
+					touchx = event.button.x;
+					touchy = event.button.y;
 					tapCount = event.button.clicks;
 
 					view->registerClick(tapCount, touchx, touchy);
@@ -416,7 +444,6 @@ Input::Input(AppData *appData, View *view) {
         }
     }
 }
-
 
 
 
