@@ -623,6 +623,10 @@ void View::drawLines(int left, int top, int right, int bottom, int bailTime) {
     latLonFromScreenCoords(&screen_lat_max, &screen_lon_max, right, bottom);
 
     drawLinesRecursive(&(map.root), screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max, style.geoColor);
+    drawLinesRecursive(&(map.water_root), screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max, style.waterColor);
+    drawLinesRecursive(&(map.coast_root), screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max, style.coastColor);
+    drawLinesRecursive(&(map.admin_root), screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max, style.adminColor);
+    drawLinesRecursive(&(map.roads_root), screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max, style.roadColor);
 
     drawLinesRecursive(&(map.airport_root), screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max, style.airportColor);
 

@@ -126,6 +126,7 @@ The app runs without generated map files, but only aircraft/trails/status will s
 The map pipeline is offline/vector-first. `getmap.sh` now keeps source downloads under `mapdata/cache`, extracts temporary shapefiles under `mapdata/work`, and writes generated viz1090 files to a chosen `--output-dir`. On low-power hardware, generate maps once and reuse the generated files:
 
 - `mapdata.bin`
+- `admin.bin`, `coast.bin`, `water.bin`, and `roads.bin` when generated maps include styled layers
 - `airportdata.bin`
 - `mapnames`
 - `airportnames`

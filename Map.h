@@ -119,6 +119,10 @@ class Map {
 
 public:
 	QuadTree root;
+	QuadTree admin_root;
+	QuadTree coast_root;
+	QuadTree water_root;
+	QuadTree roads_root;
 	QuadTree airport_root;
 
 	bool QTInsert(QuadTree *tree, Line *line, int depth);
@@ -137,6 +141,18 @@ public:
 
 	int mapPoints_count;
 	float *mapPoints;	
+
+	int adminPoints_count;
+	float *adminPoints;
+
+	int coastPoints_count;
+	float *coastPoints;
+
+	int waterPoints_count;
+	float *waterPoints;
+
+	int roadsPoints_count;
+	float *roadsPoints;
 
 	int airportPoints_count;
 	float *airportPoints;	

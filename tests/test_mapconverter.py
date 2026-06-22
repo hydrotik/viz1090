@@ -39,6 +39,16 @@ class MapConverterTests(unittest.TestCase):
         with self.assertRaises(Exception):
             mapconverter.parseBbox("-73,40,-74,41")
 
+    def test_parse_map_layer(self):
+        self.assertEqual(
+            mapconverter.parseMapLayer("roads=/tmp/roads.shp"),
+            ("roads", "/tmp/roads.shp"),
+        )
+
+    def test_parse_map_layer_rejects_bad_name(self):
+        with self.assertRaises(Exception):
+            mapconverter.parseMapLayer("bad/name=/tmp/roads.shp")
+
     def test_bbox_filter_includes_only_points_inside_bounds(self):
         bbox = [-74.1, 40.5, -73.7, 40.9]
 

@@ -278,7 +278,7 @@ viz1090 will open an SDL window set to the resolution of your screen.
 | --metric						| Display metric units | 
 | --lat                         | Specify your latitude in degrees | 
 | --lon                         | Specify your longitude in degrees | 
-| --mapdir [path]               | Directory containing generated `mapdata.bin`, `airportdata.bin`, `mapnames`, and `airportnames` |
+| --mapdir [path]               | Directory containing generated map files. New maps may include styled layer files `admin.bin`, `coast.bin`, `water.bin`, and `roads.bin`; legacy `mapdata.bin` is still supported. |
 | --label-scale [factor]        | Scale aircraft labels independently from the rest of the UI |
 | --plane-scale [factor]        | Scale aircraft icons independently from the rest of the UI |
 | --screensize [width] [height]	| Specify a resolution, otherwise use resolution of display | 

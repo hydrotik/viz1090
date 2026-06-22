@@ -76,7 +76,11 @@ clean:
 clean-generated:
 	rm -f \
 		airportdata.bin \
+		admin.bin \
+		coast.bin \
+		roads.bin \
+		water.bin \
 		airportnames \
 		mapdata.bin \
 		mapnames
-	find mapdata/generated -type f \( -name 'airportdata.bin' -o -name 'airportnames' -o -name 'mapdata.bin' -o -name 'mapnames' \) -delete 2>/dev/null || true
+	find mapdata/generated -type f \( -name 'airportdata.bin' -o -name 'admin.bin' -o -name 'coast.bin' -o -name 'roads.bin' -o -name 'water.bin' -o -name 'airportnames' -o -name 'mapdata.bin' -o -name 'mapnames' \) -delete 2>/dev/null || true

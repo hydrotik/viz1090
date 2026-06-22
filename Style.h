@@ -17,6 +17,10 @@ typedef struct Style {
     SDL_Color trailColor;
 
     SDL_Color geoColor;
+    SDL_Color adminColor;
+    SDL_Color coastColor;
+    SDL_Color waterColor;
+    SDL_Color roadColor;
     SDL_Color airportColor;
 
     SDL_Color labelColor;
@@ -101,6 +105,10 @@ private:
         planeGoneColor = grey;
         trailColor = rgb(0,255,174);
         geoColor = purple_dark;
+        adminColor = rgb(42, 28, 112);
+        coastColor = rgb(52, 70, 160);
+        waterColor = rgb(36, 96, 132);
+        roadColor = rgb(145, 112, 192);
         airportColor = purple;
         labelColor = white;
         labelLineColor = grey_dark;
@@ -122,6 +130,10 @@ private:
         planeGoneColor = rgb(30, 91, 76);
         trailColor = rgb(0, 174, 126);
         geoColor = rgb(0, 93, 72);
+        adminColor = rgb(0, 62, 55);
+        coastColor = rgb(0, 118, 120);
+        waterColor = rgb(0, 68, 88);
+        roadColor = rgb(98, 150, 82);
         airportColor = rgb(0, 196, 157);
         labelColor = rgb(198, 255, 233);
         labelLineColor = rgb(31, 117, 93);
@@ -143,6 +155,10 @@ private:
         planeGoneColor = rgb(79, 94, 103);
         trailColor = rgb(52, 172, 201);
         geoColor = rgb(66, 93, 103);
+        adminColor = rgb(50, 67, 76);
+        coastColor = rgb(45, 116, 146);
+        waterColor = rgb(28, 71, 102);
+        roadColor = rgb(178, 142, 82);
         airportColor = rgb(172, 119, 255);
         labelColor = rgb(222, 233, 236);
         labelLineColor = rgb(81, 100, 107);
@@ -164,6 +180,10 @@ private:
         planeGoneColor = rgb(125, 139, 143);
         trailColor = rgb(41, 126, 146);
         geoColor = rgb(118, 140, 145);
+        adminColor = rgb(163, 172, 173);
+        coastColor = rgb(84, 144, 172);
+        waterColor = rgb(119, 179, 204);
+        roadColor = rgb(168, 132, 72);
         airportColor = rgb(103, 72, 158);
         labelColor = rgb(15, 27, 31);
         labelLineColor = rgb(96, 115, 121);

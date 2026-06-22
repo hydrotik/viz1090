@@ -203,160 +203,140 @@ std::vector<Line*> Map::getLines(float screen_lat_min, float screen_lat_max, flo
   return getLinesRecursive(&root, screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max);
 };
 
-
-void Map::load() { 
+static bool readPointFile(const std::string &path, float **points, int *count, const char *label) {
   FILE *fileptr;
 
+  *count = 0;
+  *points = NULL;
+
+  if(!(fileptr = fopen(path.c_str(), "rb"))) {
+    return false;
+  }
+
+  fseek(fileptr, 0, SEEK_END);
+  *count = ftell(fileptr) / sizeof(float);
+  rewind(fileptr);
+
+  if(*count == 0) {
+    fclose(fileptr);
+    printf("Read 0 %s points.\n", label);
+    return true;
+  }
+
+  *points = (float *)malloc(*count * sizeof(float));
+  if(!fread(*points, sizeof(float), *count, fileptr)){
+    printf("Map read error\n");
+    exit(0);
+  }
+
+  fclose(fileptr);
+  printf("Read %d %s points.\n", *count / 2, label);
+  return true;
+}
+
+static void buildLayerTree(Map *map, QuadTree *root, float *points, int count, int *processed, int total) {
+  if(count <= 0 || points == NULL) {
+    return;
+  }
+
+  for(int i = 0; i < count; i += 2) {
+    if(points[i] == 0) {
+      continue;
+    }
+
+    if(points[i] < root->lon_min) {
+      root->lon_min = points[i];
+    } else if(points[i] > root->lon_max) {
+      root->lon_max = points[i];
+    }
+
+    if(points[i + 1] < root->lat_min) {
+      root->lat_min = points[i + 1];
+    } else if(points[i + 1] > root->lat_max) {
+      root->lat_max = points[i + 1];
+    }
+  }
+
+  Point currentPoint;
+  Point nextPoint;
+
+  for(int i = 0; i < count - 2; i += 2) {
+    if(points[i] == 0) {
+      continue;
+    }
+    if(points[i + 1] == 0) {
+      continue;
+    }
+    if(points[i + 2] == 0) {
+      continue;
+    }
+    if(points[i + 3] == 0) {
+      continue;
+    }
+
+    currentPoint.lon = points[i];
+    currentPoint.lat = points[i + 1];
+    nextPoint.lon = points[i + 2];
+    nextPoint.lat = points[i + 3];
+
+    map->QTInsert(root, new Line(currentPoint, nextPoint), 0);
+    (*processed)++;
+
+    if(total > 0) {
+      map->loaded = floor(100.0f * (float)(*processed) / (float)total);
+    }
+  }
+}
+
+
+void Map::load() { 
   std::string mapDataPath = joinPath(dataDir, "mapdata.bin");
+  std::string adminDataPath = joinPath(dataDir, "admin.bin");
+  std::string coastDataPath = joinPath(dataDir, "coast.bin");
+  std::string waterDataPath = joinPath(dataDir, "water.bin");
+  std::string roadsDataPath = joinPath(dataDir, "roads.bin");
   std::string airportDataPath = joinPath(dataDir, "airportdata.bin");
   std::string mapNamesPath = joinPath(dataDir, "mapnames");
   std::string airportNamesPath = joinPath(dataDir, "airportnames");
 
-  if((fileptr = fopen(mapDataPath.c_str(), "rb"))) {
-      
+  bool loadedLayers = false;
+  loadedLayers = readPointFile(adminDataPath, &adminPoints, &adminPoints_count, "admin layer") || loadedLayers;
+  loadedLayers = readPointFile(coastDataPath, &coastPoints, &coastPoints_count, "coast layer") || loadedLayers;
+  loadedLayers = readPointFile(waterDataPath, &waterPoints, &waterPoints_count, "water layer") || loadedLayers;
+  loadedLayers = readPointFile(roadsDataPath, &roadsPoints, &roadsPoints_count, "roads layer") || loadedLayers;
 
-    fseek(fileptr, 0, SEEK_END);
-    mapPoints_count = ftell(fileptr) / sizeof(float);
-    rewind(fileptr);                   
-
-    mapPoints = (float *)malloc(mapPoints_count * sizeof(float)); 
-    if(!fread(mapPoints, sizeof(float), mapPoints_count, fileptr)){
-      printf("Map read error\n");
-      exit(0);
-    } 
-
-    fclose(fileptr);
-
-    printf("Read %d map points.\n",mapPoints_count / 2);
+  if(!loadedLayers) {
+    readPointFile(mapDataPath, &mapPoints, &mapPoints_count, "map");
   }
 
-   
-   if((fileptr = fopen(airportDataPath.c_str(), "rb"))) {
-    fseek(fileptr, 0, SEEK_END);
-    airportPoints_count = ftell(fileptr) / sizeof(float);
-    rewind(fileptr);
+  readPointFile(airportDataPath, &airportPoints, &airportPoints_count, "airport");
 
-    airportPoints = (float *)malloc(airportPoints_count * sizeof(float));
-    if(!fread(airportPoints, sizeof(float), airportPoints_count, fileptr)){
-      printf("Map read error\n");
-      exit(0);
-    }
-
-    fclose(fileptr);
-
-    printf("Read %d airport points.\n",airportPoints_count / 2);
-    }
- 
- 
-  int total = mapPoints_count / 2 + airportPoints_count / 2;
+  int total = mapPoints_count / 2 +
+    adminPoints_count / 2 +
+    coastPoints_count / 2 +
+    waterPoints_count / 2 +
+    roadsPoints_count / 2 +
+    airportPoints_count / 2;
   int processed = 0;
- 
-  // load quad tree
-    if(mapPoints_count > 0) {
-  	for(int i = 0; i < mapPoints_count; i+=2) {
-  		if(mapPoints[i] == 0)
-  			continue;
 
-  		if(mapPoints[i] < root.lon_min) {
-  			root.lon_min = mapPoints[i];
-  		} else if(mapPoints[i] > root.lon_max) {
-  			root.lon_max = mapPoints[i];
-  		} 
-
-  		if(mapPoints[i+1] < root.lat_min) {
-  			root.lat_min = mapPoints[i+1];
-  		} else if(mapPoints[i+1] > root.lat_max) {
-  			root.lat_max = mapPoints[i+1];
-  		} 
-  	}
-
-    //printf("map bounds: %f %f %f %f\n",root.lon_min, root.lon_max, root.lat_min, root.lat_max);
-
-    Point currentPoint;
-    Point nextPoint;
-
-    for(int i = 0; i < mapPoints_count - 2; i+=2) {
-      if(mapPoints[i] == 0)
-        continue;
-      if(mapPoints[i + 1] == 0)
-        continue;
-      if(mapPoints[i + 2] == 0)
-        continue;
-      if(mapPoints[i + 3] == 0)
-        continue;
-      currentPoint.lon = mapPoints[i];
-      currentPoint.lat = mapPoints[i + 1];
-
-      nextPoint.lon = mapPoints[i + 2];
-      nextPoint.lat = mapPoints[i + 3];
-
-      // printf("inserting [%f %f] -> [%f %f]\n",currentPoint.lon,currentPoint.lat,nextPoint.lon,nextPoint.lat);
-
-      QTInsert(&root, new Line(currentPoint, nextPoint), 0);
-
-      processed++;
-
-      loaded = floor(100.0f * (float)processed / (float)total);
-  	}
+  if(mapPoints_count > 0) {
+    buildLayerTree(this, &root, mapPoints, mapPoints_count, &processed, total);
   } else {
-    printf("No map file found\n");
+    if(!loadedLayers) {
+      printf("No map file found\n");
+    }
   }
-//
 
+  buildLayerTree(this, &admin_root, adminPoints, adminPoints_count, &processed, total);
+  buildLayerTree(this, &coast_root, coastPoints, coastPoints_count, &processed, total);
+  buildLayerTree(this, &water_root, waterPoints, waterPoints_count, &processed, total);
+  buildLayerTree(this, &roads_root, roadsPoints, roadsPoints_count, &processed, total);
 
-
-    // load quad tree
-    if(airportPoints_count > 0) {
-    for(int i = 0; i < airportPoints_count; i+=2) {
-      if(airportPoints[i] == 0)
-        continue;
-
-      if(airportPoints[i] < airport_root.lon_min) {
-        airport_root.lon_min = airportPoints[i];
-      } else if(airportPoints[i] > airport_root.lon_max) {
-        airport_root.lon_max = airportPoints[i];
-      } 
-
-      if(airportPoints[i+1] < airport_root.lat_min) {
-        airport_root.lat_min = airportPoints[i+1];
-      } else if(airportPoints[i+1] > airport_root.lat_max) {
-        airport_root.lat_max = airportPoints[i+1];
-      } 
-    }
-
-    //printf("map bounds: %f %f %f %f\n",root.lon_min, root.lon_max, root.lat_min, root.lat_max);
-
-    Point currentPoint;
-    Point nextPoint;
-
-    for(int i = 0; i < airportPoints_count - 2; i+=2) {
-      if(airportPoints[i] == 0)
-        continue;
-      if(airportPoints[i + 1] == 0)
-        continue;
-      if(airportPoints[i + 2] == 0)
-        continue;
-      if(airportPoints[i + 3] == 0)
-        continue;
-      currentPoint.lon = airportPoints[i];
-      currentPoint.lat = airportPoints[i + 1];
-
-      nextPoint.lon = airportPoints[i + 2];
-      nextPoint.lat = airportPoints[i + 3];
-
-      //printf("inserting [%f %f] -> [%f %f]\n",currentPoint.lon,currentPoint.lat,nextPoint.lon,nextPoint.lat);
-
-      QTInsert(&airport_root, new Line(currentPoint, nextPoint), 0);
-
-      processed++;
-
-      loaded = floor(100.0f * (float)processed / (float)total);
-    }
+  if(airportPoints_count > 0) {
+    buildLayerTree(this, &airport_root, airportPoints, airportPoints_count, &processed, total);
   } else {
     printf("No airport file found\n");
   }
-
-//
 
 
   std::string line;
@@ -433,6 +413,18 @@ Map::Map() {
 
     mapPoints_count = 0;
     mapPoints = NULL;
+
+    adminPoints_count = 0;
+    adminPoints = NULL;
+
+    coastPoints_count = 0;
+    coastPoints = NULL;
+
+    waterPoints_count = 0;
+    waterPoints = NULL;
+
+    roadsPoints_count = 0;
+    roadsPoints = NULL;
 
     airportPoints_count = 0;
     airportPoints = NULL;

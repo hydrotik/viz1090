@@ -73,6 +73,24 @@ def writeFloatBin(path, values):
 		np.asarray(values).astype(np.single).tofile(bin_file)
 
 
+def parseMapLayer(value):
+	if "=" not in value:
+		raise argparse.ArgumentTypeError("map layer must be name=shapefile")
+
+	name, path = value.split("=", 1)
+	name = name.strip()
+	path = path.strip()
+
+	if not name or not path:
+		raise argparse.ArgumentTypeError("map layer must include both name and shapefile")
+
+	for char in name:
+		if not (char.isalnum() or char in ("_", "-")):
+			raise argparse.ArgumentTypeError("map layer name may only contain letters, numbers, underscore, and dash")
+
+	return name, path
+
+
 def inBbox(lon, lat, bbox):
 	if bbox is None:
 		return True
@@ -156,6 +174,7 @@ def outputPath(output_dir, filename):
 def buildParser():
 	parser = argparse.ArgumentParser(description='viz1090 Natural Earth Data Map Converter')
 	parser.add_argument("--mapfile", action="append", type=str, help="shapefile for main map; may be repeated")
+	parser.add_argument("--maplayer", action="append", type=parseMapLayer, help="named map layer as name=shapefile; may be repeated")
 	parser.add_argument("--mapnames", type=str, help="shapefile for map place names")
 	parser.add_argument("--airportfile", type=str, help="shapefile for airport runway outlines")
 	parser.add_argument("--airportcsv", type=str, help="OurAirports runways.csv fallback for runway centerlines")
@@ -174,11 +193,25 @@ def main(argv=None):
 	output_dir = Path(args.output_dir)
 	output_dir.mkdir(parents=True, exist_ok=True)
 
+	outlist = []
+	if args.maplayer is not None:
+		layer_outputs = {}
+		for layer_name, layer_file in args.maplayer:
+			shapefile = fiona.open(layer_file)
+			layer_lines = extractLines(shapefile, args.tolerance, args.bbox)
+			layer_outputs.setdefault(layer_name, []).extend(layer_lines)
+			outlist.extend(layer_lines)
+			print("Wrote %d %s layer points" % (len(layer_lines) / 2, layer_name))
+		for layer_name, layer_lines in layer_outputs.items():
+			writeFloatBin(outputPath(output_dir, layer_name + ".bin"), layer_lines)
+			print("Wrote %d combined %s layer points" % (len(layer_lines) / 2, layer_name))
+
 	if args.mapfile is not None:
-		outlist = []
 		for mapfile in args.mapfile:
 			shapefile = fiona.open(mapfile)
 			outlist.extend(extractLines(shapefile, args.tolerance, args.bbox))
+
+	if outlist:
 		writeFloatBin(outputPath(output_dir, "mapdata.bin"), outlist)
 		print("Wrote %d points" % (len(outlist) / 2))
 

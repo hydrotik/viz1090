@@ -254,8 +254,8 @@ if [[ "${RUNWAYS_AVAILABLE}" -eq 1 ]]; then
 fi
 
 converter_args=(
-    --mapfile "${WORK_DIR}/ne_10m_admin_1_states_provinces.shp"
-    --mapfile "${WORK_DIR}/ne_10m_coastline.shp"
+    --maplayer "admin=${WORK_DIR}/ne_10m_admin_1_states_provinces.shp"
+    --maplayer "coast=${WORK_DIR}/ne_10m_coastline.shp"
     --mapnames "${WORK_DIR}/ne_10m_populated_places.shp"
     --airportnames "${WORK_DIR}/ne_10m_airports.shp"
     --output-dir "${OUTPUT_DIR}"
@@ -264,15 +264,15 @@ converter_args=(
 )
 
 if [[ "${ROADS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_roads.shp" ]]; then
-    converter_args+=(--mapfile "${WORK_DIR}/ne_10m_roads.shp")
+    converter_args+=(--maplayer "roads=${WORK_DIR}/ne_10m_roads.shp")
 fi
 
 if [[ "${LAKES_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_lakes.shp" ]]; then
-    converter_args+=(--mapfile "${WORK_DIR}/ne_10m_lakes.shp")
+    converter_args+=(--maplayer "water=${WORK_DIR}/ne_10m_lakes.shp")
 fi
 
 if [[ "${RIVERS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/ne_10m_rivers_lake_centerlines.shp" ]]; then
-    converter_args+=(--mapfile "${WORK_DIR}/ne_10m_rivers_lake_centerlines.shp")
+    converter_args+=(--maplayer "water=${WORK_DIR}/ne_10m_rivers_lake_centerlines.shp")
 fi
 
 if [[ "${RUNWAYS_AVAILABLE}" -eq 1 && -f "${WORK_DIR}/Runways.shp" ]]; then
