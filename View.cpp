@@ -1353,6 +1353,14 @@ void View::drawWeatherTiles() {
     int visibleTop = screen_height;
     int visibleRight = 0;
     int visibleBottom = 0;
+    int offscreenTiles = 0;
+    int offscreenIntensity = 0;
+    float offscreenX = 0.0f;
+    float offscreenY = 0.0f;
+    int drawableBottom = screen_height - statusFontHeight - 3 * PAD;
+    if(drawableBottom < screen_height / 2) {
+        drawableBottom = screen_height;
+    }
 
     for(std::vector<WeatherTile>::iterator tile = weather_tiles.begin(); tile != weather_tiles.end(); ++tile) {
         float dx, dy;
@@ -1384,24 +1392,71 @@ void View::drawWeatherTiles() {
             width,
             height
         };
+        SDL_Rect clippedRect = tileRect;
+
+        if(clippedRect.x < 0) {
+            clippedRect.w += clippedRect.x;
+            clippedRect.x = 0;
+        }
+        if(clippedRect.y < 0) {
+            clippedRect.h += clippedRect.y;
+            clippedRect.y = 0;
+        }
+        if(clippedRect.x + clippedRect.w > screen_width) {
+            clippedRect.w = screen_width - clippedRect.x;
+        }
+        if(clippedRect.y + clippedRect.h > drawableBottom) {
+            clippedRect.h = drawableBottom - clippedRect.y;
+        }
+
+        if(clippedRect.w <= 0 || clippedRect.h <= 0) {
+            offscreenTiles++;
+            offscreenIntensity = std::max(offscreenIntensity, tile->intensity);
+            offscreenX += (left + right) * 0.5f;
+            offscreenY += (top + bottom) * 0.5f;
+            continue;
+        }
+
         SDL_Color color = weatherColorForIntensity(tile->intensity);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_Rect shadowRect = {
+            clippedRect.x - 1,
+            clippedRect.y - 1,
+            clippedRect.w + 2,
+            clippedRect.h + 2
+        };
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 120);
+        SDL_RenderFillRect(renderer, &shadowRect);
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &tileRect);
+        SDL_RenderFillRect(renderer, &clippedRect);
         visibleTiles++;
         visibleIntensityCounts[tile->intensity]++;
-        visibleLeft = std::min(visibleLeft, std::max(0, tileRect.x));
-        visibleTop = std::min(visibleTop, std::max(0, tileRect.y));
-        visibleRight = std::max(visibleRight, std::min(screen_width, tileRect.x + tileRect.w));
-        visibleBottom = std::max(visibleBottom, std::min(screen_height, tileRect.y + tileRect.h));
+        visibleLeft = std::min(visibleLeft, clippedRect.x);
+        visibleTop = std::min(visibleTop, clippedRect.y);
+        visibleRight = std::max(visibleRight, clippedRect.x + clippedRect.w);
+        visibleBottom = std::max(visibleBottom, clippedRect.y + clippedRect.h);
+    }
+
+    if(visibleTiles == 0 && offscreenTiles > 0) {
+        offscreenX /= static_cast<float>(offscreenTiles);
+        offscreenY /= static_cast<float>(offscreenTiles);
+        int markerX = std::max(24, std::min(screen_width - 24, static_cast<int>(offscreenX)));
+        int markerY = std::max(24, std::min(drawableBottom - 24, static_cast<int>(offscreenY)));
+        SDL_Color markerColor = weatherColorForIntensity(offscreenIntensity);
+
+        filledCircleRGBA(renderer, markerX, markerY, 14, markerColor.r, markerColor.g, markerColor.b, 230);
+        circleRGBA(renderer, markerX, markerY, 15, 0, 0, 0, 255);
+        thickLineRGBA(renderer, markerX - 9, markerY, markerX + 9, markerY, 3, 0, 0, 0, 220);
+        thickLineRGBA(renderer, markerX, markerY - 9, markerX, markerY + 9, 3, 0, 0, 0, 220);
     }
 
     if(debug_weather && elapsed_s(lastWeatherDebugPrint) >= 5.0f) {
         printf(
-            "weather: visible %d/%zu tiles center %.4f,%.4f zoom %.2f intensities 1=%d 2=%d 3=%d 4=%d screen %d,%d to %d,%d\n",
+            "weather: visible %d/%zu drawable tiles, offscreen %d center %.4f,%.4f zoom %.2f intensities 1=%d 2=%d 3=%d 4=%d screen %d,%d to %d,%d drawable-bottom %d\n",
             visibleTiles,
             weather_tiles.size(),
+            offscreenTiles,
             centerLon,
             centerLat,
             currentMaxDist,
@@ -1412,7 +1467,8 @@ void View::drawWeatherTiles() {
             visibleLeft,
             visibleTop,
             visibleRight,
-            visibleBottom
+            visibleBottom,
+            drawableBottom
         );
         fflush(stdout);
         lastWeatherDebugPrint = now();
