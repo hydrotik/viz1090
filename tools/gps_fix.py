@@ -53,6 +53,13 @@ def nmea_coord(raw_value, hemisphere):
     return value
 
 
+def nmea_fix_from_fields(lat_value, lat_hemisphere, lon_value, lon_hemisphere):
+    try:
+        return nmea_coord(lat_value, lat_hemisphere), nmea_coord(lon_value, lon_hemisphere)
+    except ValueError:
+        return None
+
+
 def parse_nmea_fix(line):
     line = line.strip()
     if not line.startswith("$"):
@@ -64,12 +71,17 @@ def parse_nmea_fix(line):
     if sentence == "GGA" and len(fields) >= 7:
         quality = fields[6]
         if quality and quality != "0":
-            return nmea_coord(fields[2], fields[3]), nmea_coord(fields[4], fields[5])
+            return nmea_fix_from_fields(fields[2], fields[3], fields[4], fields[5])
 
     if sentence == "RMC" and len(fields) >= 7:
         status = fields[2]
         if status == "A":
-            return nmea_coord(fields[3], fields[4]), nmea_coord(fields[5], fields[6])
+            return nmea_fix_from_fields(fields[3], fields[4], fields[5], fields[6])
+
+    if sentence == "GLL" and len(fields) >= 7:
+        status = fields[6]
+        if status == "A":
+            return nmea_fix_from_fields(fields[1], fields[2], fields[3], fields[4])
 
     return None
 
@@ -210,12 +222,22 @@ def diagnose_gpsd(timeout):
 
 def diagnose_serial(devices, timeout, baud, raw_lines):
     per_device_timeout = max(1.0, timeout / max(1, len(devices)))
+    visited = set()
 
     for device in devices:
         print("serial: %s" % describe_device(device))
         path = Path(device)
         if not path.exists():
             continue
+
+        try:
+            resolved = str(path.resolve())
+        except OSError:
+            resolved = str(path)
+        if resolved in visited:
+            print("serial: skipping %s; already checked %s" % (device, resolved))
+            continue
+        visited.add(resolved)
 
         deadline = time.monotonic() + per_device_timeout
         try:
