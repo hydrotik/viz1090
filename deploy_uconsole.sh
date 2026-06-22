@@ -97,7 +97,10 @@ rsync -av --delete \
     "${REMOTE}:${REMOTE_DIR}/"
 
 if [[ "${SYNC_TILES}" -eq 1 ]]; then
-    mapfile -t tile_files < <(
+    tile_files=()
+    while IFS= read -r tile; do
+        tile_files+=("${tile}")
+    done < <(
         python3 - "${TILE_PROFILES[@]}" <<'PY'
 import sys
 from tools.coverage_profiles import MAP_PROFILES, profile_names_for_group
