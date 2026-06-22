@@ -108,7 +108,7 @@ def decode_png_rgba(data):
             width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(
                 ">IIBBBBB", payload
             )
-            if bit_depth != 8 or compression != 0 or filter_method != 0 or interlace != 0:
+            if compression != 0 or filter_method != 0 or interlace != 0:
                 raise ValueError("unsupported PNG format")
         elif kind == b"PLTE":
             palette = [tuple(payload[i : i + 3]) for i in range(0, len(payload), 3)]
@@ -121,16 +121,24 @@ def decode_png_rgba(data):
         raise ValueError("PNG missing IHDR")
 
     if color_type == 6:
+        if bit_depth != 8:
+            raise ValueError("unsupported PNG format")
         raw_bpp = 4
+        stride = width * raw_bpp
     elif color_type == 2:
+        if bit_depth != 8:
+            raise ValueError("unsupported PNG format")
         raw_bpp = 3
+        stride = width * raw_bpp
     elif color_type == 3:
+        if bit_depth not in (1, 2, 4, 8):
+            raise ValueError("unsupported PNG format")
         raw_bpp = 1
+        stride = (width * bit_depth + 7) // 8
     else:
         raise ValueError("unsupported PNG color type %s" % color_type)
 
     raw = zlib.decompress(b"".join(compressed))
-    stride = width * raw_bpp
     rows = []
     pos = 0
     previous = bytearray(stride)
@@ -170,7 +178,20 @@ def decode_png_rgba(data):
     else:
         for row in rows:
             decoded = []
-            for value in row:
+            if bit_depth == 8:
+                values = row[:width]
+            else:
+                values = []
+                mask = (1 << bit_depth) - 1
+                for packed in row:
+                    for shift in range(8 - bit_depth, -1, -bit_depth):
+                        values.append((packed >> shift) & mask)
+                        if len(values) == width:
+                            break
+                    if len(values) == width:
+                        break
+
+            for value in values:
                 if value >= len(palette):
                     decoded.append((0, 0, 0, 0))
                     continue

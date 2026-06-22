@@ -27,6 +27,35 @@ def make_rgba_png(width, height, pixels):
     )
 
 
+def make_indexed_png(width, height, bit_depth, palette, rows):
+    def chunk(kind, payload):
+        body = kind + payload
+        crc = zlib.crc32(body) & 0xFFFFFFFF
+        return struct.pack(">I", len(payload)) + body + struct.pack(">I", crc)
+
+    packed_rows = []
+    pixels_per_byte = 8 // bit_depth
+    for row in rows:
+        out = bytearray([0])
+        for start in range(0, width, pixels_per_byte):
+            packed = 0
+            for value in row[start : start + pixels_per_byte]:
+                packed = (packed << bit_depth) | value
+            missing = pixels_per_byte - len(row[start : start + pixels_per_byte])
+            packed <<= missing * bit_depth
+            out.append(packed)
+        packed_rows.append(bytes(out))
+
+    palette_bytes = b"".join(bytes(rgb) for rgb in palette)
+    return (
+        network_weather.PNG_SIGNATURE
+        + chunk("IHDR".encode("ascii"), struct.pack(">IIBBBBB", width, height, bit_depth, 3, 0, 0, 0))
+        + chunk("PLTE".encode("ascii"), palette_bytes)
+        + chunk("IDAT".encode("ascii"), zlib.compress(b"".join(packed_rows)))
+        + chunk("IEND".encode("ascii"), b"")
+    )
+
+
 class NetworkWeatherTests(unittest.TestCase):
     def test_latest_radar_frame_uses_newest_past_or_nowcast(self):
         metadata = {
@@ -74,6 +103,18 @@ class NetworkWeatherTests(unittest.TestCase):
 
         self.assertEqual((width, height), (1, 1))
         self.assertEqual(pixels[0][0], (10, 20, 30, 40))
+
+    def test_decode_png_indexed_4bit(self):
+        palette = [(0, 0, 0), (0, 180, 60), (230, 205, 38), (220, 55, 42)]
+        png = make_indexed_png(4, 1, 4, palette, [[0, 1, 2, 3]])
+
+        width, height, pixels = network_weather.decode_png_rgba(png)
+
+        self.assertEqual((width, height), (4, 1))
+        self.assertEqual(
+            pixels[0],
+            [(0, 0, 0, 255), (0, 180, 60, 255), (230, 205, 38, 255), (220, 55, 42, 255)],
+        )
 
     def test_tiles_from_image_extracts_precipitation_cells(self):
         pixels = [
