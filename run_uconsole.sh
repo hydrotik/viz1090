@@ -19,6 +19,7 @@ UISCALE="1"
 PLANE_SCALE="1.5"
 LABEL_SCALE="1.9"
 STATUS_SCALE="1.8"
+WEATHER_MIN_PIXELS="2"
 TILE_SOURCE=""
 TILE_MODE="auto"
 TILE_THEME="auto"
@@ -34,6 +35,7 @@ SIMULATE_WEATHER=0
 REGEN_MAP=0
 SKIP_MAP=0
 DEBUG_INPUT=0
+DEBUG_WEATHER=0
 EXTRA_ARGS=()
 
 usage() {
@@ -74,8 +76,10 @@ Options:
   --plane-scale <n>   Aircraft icon scale. Default: 1.5
   --label-scale <n>   Aircraft label scale. Default: 1.9
   --status-scale <n>  Bottom status text scale. Default: 1.8
+  --weather-min-pixels <n> Minimum rendered radar cell size. Default: 2
   --simulate-weather  Draw a simulated radar storm cell.
   --debug-input       Print SDL input events to stdout.
+  --debug-weather     Print radar cache load/render diagnostics.
   --tolerance <value> Map simplification tolerance. Default: profile-specific.
   --minpop <value>    Minimum city population label. Default: 100000
   --no-roads          Do not include roads in regenerated map data.
@@ -286,12 +290,20 @@ while [[ $# -gt 0 ]]; do
             STATUS_SCALE="$2"
             shift 2
             ;;
+        --weather-min-pixels)
+            WEATHER_MIN_PIXELS="$2"
+            shift 2
+            ;;
         --simulate-weather)
             SIMULATE_WEATHER=1
             shift
             ;;
         --debug-input)
             DEBUG_INPUT=1
+            shift
+            ;;
+        --debug-weather)
+            DEBUG_WEATHER=1
             shift
             ;;
         --tolerance)
@@ -444,6 +456,7 @@ viz_args=(
     --plane-scale "${PLANE_SCALE}"
     --label-scale "${LABEL_SCALE}"
     --status-scale "${STATUS_SCALE}"
+    --weather-min-pixels "${WEATHER_MIN_PIXELS}"
     --mapdir "${MAP_DIR}"
     --theme "${THEME}"
     --lat "${LAT}"
@@ -477,6 +490,9 @@ fi
 
 if [[ "${DEBUG_INPUT}" -eq 1 ]]; then
     viz_args+=(--debug-input)
+fi
+if [[ "${DEBUG_WEATHER}" -eq 1 ]]; then
+    viz_args+=(--debug-weather)
 fi
 
 exec ./viz1090 "${viz_args[@]}" "${EXTRA_ARGS[@]}"

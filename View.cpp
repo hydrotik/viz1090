@@ -1206,18 +1206,18 @@ void View::drawGeography() {
 
 static SDL_Color weatherColorForIntensity(int intensity) {
     if(intensity >= 4) {
-        return {198, 42, 198, 150};
+        return {198, 42, 198, 190};
     }
 
     if(intensity == 3) {
-        return {220, 55, 42, 135};
+        return {220, 55, 42, 175};
     }
 
     if(intensity == 2) {
-        return {230, 205, 38, 115};
+        return {230, 205, 38, 155};
     }
 
-    return {0, 170, 90, 90};
+    return {0, 180, 90, 130};
 }
 
 void View::loadWeatherTiles() {
@@ -1237,6 +1237,11 @@ void View::loadWeatherTiles() {
 
     std::vector<WeatherTile> loaded_tiles;
     std::string line;
+    float latMin = 90.0f;
+    float latMax = -90.0f;
+    float lonMin = 180.0f;
+    float lonMax = -180.0f;
+    int intensityCounts[5] = {0, 0, 0, 0, 0};
 
     while(std::getline(infile, line)) {
         if(line.empty() || line[0] == '#') {
@@ -1262,7 +1267,33 @@ void View::loadWeatherTiles() {
             std::swap(tile.lon_min, tile.lon_max);
         }
 
+        latMin = std::min(latMin, tile.lat_min);
+        latMax = std::max(latMax, tile.lat_max);
+        lonMin = std::min(lonMin, tile.lon_min);
+        lonMax = std::max(lonMax, tile.lon_max);
+        intensityCounts[tile.intensity]++;
         loaded_tiles.push_back(tile);
+    }
+
+    if(debug_weather) {
+        if(loaded_tiles.empty()) {
+            printf("weather: loaded 0 tiles from %s\n", weather_file.c_str());
+        } else {
+            printf(
+                "weather: loaded %zu tiles from %s bounds %.4f,%.4f to %.4f,%.4f intensities 1=%d 2=%d 3=%d 4=%d\n",
+                loaded_tiles.size(),
+                weather_file.c_str(),
+                lonMin,
+                latMin,
+                lonMax,
+                latMax,
+                intensityCounts[1],
+                intensityCounts[2],
+                intensityCounts[3],
+                intensityCounts[4]
+            );
+        }
+        fflush(stdout);
     }
 
     weather_tiles.swap(loaded_tiles);
@@ -1316,6 +1347,7 @@ void View::updateSimulatedWeatherTiles() {
 }
 
 void View::drawWeatherTiles() {
+    int visibleTiles = 0;
     for(std::vector<WeatherTile>::iterator tile = weather_tiles.begin(); tile != weather_tiles.end(); ++tile) {
         float dx, dy;
         int x1, y1, x2, y2, x3, y3, x4, y4;
@@ -1337,18 +1369,34 @@ void View::drawWeatherTiles() {
         int right = std::max(std::max(x1, x2), std::max(x3, x4));
         int top = std::min(std::min(y1, y2), std::min(y3, y4));
         int bottom = std::max(std::max(y1, y2), std::max(y3, y4));
+        int width = std::max(weather_min_pixels, right - left);
+        int height = std::max(weather_min_pixels, bottom - top);
 
         SDL_Rect tileRect = {
             left,
             top,
-            std::max(1, right - left),
-            std::max(1, bottom - top)
+            width,
+            height
         };
         SDL_Color color = weatherColorForIntensity(tile->intensity);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(renderer, &tileRect);
+        visibleTiles++;
+    }
+
+    if(debug_weather && elapsed_s(lastWeatherDebugPrint) >= 5.0f) {
+        printf(
+            "weather: visible %d/%zu tiles center %.4f,%.4f zoom %.2f\n",
+            visibleTiles,
+            weather_tiles.size(),
+            centerLon,
+            centerLat,
+            currentMaxDist
+        );
+        fflush(stdout);
+        lastWeatherDebugPrint = now();
     }
 }
 
@@ -1799,6 +1847,8 @@ View::View(AppData *appData){
     label_scale             = 1.0f;
     status_scale            = 1.0f;
     simulate_weather        = false;
+    debug_weather           = false;
+    weather_min_pixels      = 2;
     weather_file            = "";
     raster_tile_source      = "";
     raster_tile_mode        = "auto";
@@ -1833,6 +1883,7 @@ View::View(AppData *appData){
     lastFrameTime = 0;
     weatherStartTime = now();
     lastWeatherLoad = std::chrono::high_resolution_clock::time_point();
+    lastWeatherDebugPrint = std::chrono::high_resolution_clock::time_point();
 
     centerLon   = 0;
     centerLat   = 0;

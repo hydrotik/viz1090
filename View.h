@@ -206,9 +206,12 @@ class View {
 	    float label_scale;
 	    float status_scale;
 	    bool simulate_weather;
+	    bool debug_weather;
+	    int weather_min_pixels;
 	    std::string weather_file;
 	    std::vector<WeatherTile> weather_tiles;
 	    std::chrono::high_resolution_clock::time_point lastWeatherLoad;
+	    std::chrono::high_resolution_clock::time_point lastWeatherDebugPrint;
 	    std::string raster_tile_source;
 	    std::string raster_tile_mode;
 	    std::string raster_tile_theme;

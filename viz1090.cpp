@@ -56,6 +56,7 @@ void showHelp(void) {
 "--fullscreen                     Start fullscreen\n"
 "--help                           Show this help\n"
 "--debug-input                    Print SDL input events to stdout\n"
+"--debug-weather                  Print radar cache load/render diagnostics\n"
 "--lat <latitude>                 Latitude in degrees\n"
 "--label-scale <factor>           Aircraft label scaling (default: 1.0)\n"
 "--lon <longitude>                Longitude in degrees\n"
@@ -79,6 +80,7 @@ void showHelp(void) {
 "--tile-zoom-offset <n>           Adjust chosen raster tile zoom (default: 0)\n"
 "--uiscale <factor>               UI global scaling (default: 1)\n"  
 "--weather-file <path>            Radar tile cache file to render\n"
+"--weather-min-pixels <n>         Minimum rendered radar cell size (default: 2)\n"
     );
 }
 
@@ -250,6 +252,15 @@ int main(int argc, char **argv) {
             view.fps = 1;
         } else if (!strcmp(argv[j],"--debug-input")) {
             debugInput = true;
+        } else if (!strcmp(argv[j],"--debug-weather")) {
+            view.debug_weather = true;
+        } else if (!strcmp(argv[j],"--weather-min-pixels")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.weather_min_pixels) || view.weather_min_pixels < 1 || view.weather_min_pixels > 12) {
+                fprintf(stderr, "Invalid weather min pixels '%s'. Expected 1 to 12.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--fullscreen")) {
             view.fullscreen = 1;
         } else if (!strcmp(argv[j],"--simulate-weather")) {
