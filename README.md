@@ -319,6 +319,22 @@ For continuous updates:
 
 The hybrid updater tries RF UAT first. When RF captures decode zero messages, it fetches internet radar into the same `weather/radar_tiles.csv` cache and increases the RF retry interval up to a maximum. `run_uconsole.sh` passes this weather file to viz1090 even before it exists, and the renderer reloads it every 30 seconds, so the updater can be started before or after the app. The network fallback defaults to a lower-48 bbox (`-125,24,-66,50`) so zoomed-out weather can appear away from the current receiver location. Use `--local-weather` for a smaller current-location fetch, or `--weather-bbox lon_min,lat_min,lon_max,lat_max` for a custom area. The network fallback currently uses RainViewer's public Weather Maps API, which is free for personal/educational/small community use, best-effort, and requires visible attribution: "Weather data by RainViewer".
 
+For a sharper NYC-area radar overlay, use a smaller bbox with higher network zoom and smaller output cells:
+
+```
+./run_weather_hybrid_cycle.sh \
+  --no-rf \
+  --no-gps \
+  --weather-bbox=-75,39.8,-71.8,42.2 \
+  --network-zoom 8 \
+  --network-cell-pixels 3 \
+  --network-min-coverage 0.08 \
+  --min-interval 300 \
+  --max-interval 300
+```
+
+Zoom 9 can add detail, but it increases network requests and CSV size. Start with zoom 8/cell-pixels 3 on the uConsole and only increase if rendering stays smooth.
+
 To diagnose the uConsole GPS path while the device sits near a window:
 
 ```

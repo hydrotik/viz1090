@@ -49,6 +49,14 @@ def run_network(args):
         args.weather_file,
         "--zoom",
         str(args.network_zoom),
+        "--size",
+        str(args.network_size),
+        "--cell-pixels",
+        str(args.network_cell_pixels),
+        "--min-coverage",
+        str(args.network_min_coverage),
+        "--smooth",
+        str(args.network_smooth),
     ]
     if args.weather_bbox:
         command.append("--bbox=%s" % args.weather_bbox)
@@ -103,6 +111,10 @@ def build_parser():
     parser.add_argument("--network", action="store_true", default=True)
     parser.add_argument("--no-network", action="store_false", dest="network")
     parser.add_argument("--network-zoom", type=int, default=5)
+    parser.add_argument("--network-size", type=int, choices=(256, 512), default=512)
+    parser.add_argument("--network-cell-pixels", type=int, default=6)
+    parser.add_argument("--network-min-coverage", type=float, default=0.15)
+    parser.add_argument("--network-smooth", type=int, choices=(0, 1), default=1)
     parser.add_argument("--weather-bbox", default="")
     parser.add_argument("--network-preserve-empty", action="store_true")
     parser.add_argument("--no-rf", action="store_true")

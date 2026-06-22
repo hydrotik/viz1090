@@ -16,6 +16,10 @@ MIN_INTERVAL="240"
 MAX_INTERVAL="1800"
 WEATHER_BBOX="-125,24,-66,50"
 NETWORK_ZOOM="5"
+NETWORK_SIZE="512"
+NETWORK_CELL_PIXELS="6"
+NETWORK_MIN_COVERAGE="0.15"
+NETWORK_SMOOTH="1"
 NETWORK=1
 NO_RF=0
 NETWORK_PRESERVE_EMPTY=0
@@ -49,6 +53,10 @@ Options:
                          Default: -125,24,-66,50
   --local-weather        Fetch network radar around current location instead of bbox.
   --network-zoom <z>     Network radar zoom. Default: 5 for bbox coverage.
+  --network-size <px>    Network radar source tile size, 256 or 512. Default: 512
+  --network-cell-pixels <n> Radar output cell size in source pixels. Default: 6
+  --network-min-coverage <n> Minimum precipitation coverage per cell. Default: 0.15
+  --network-smooth <0|1> RainViewer smoothing. Default: 1
   --no-rf                Skip UAT/FIS-B and fetch network radar only.
   --no-network           Do not use internet fallback.
   --network-preserve-empty Preserve existing radar cache when network returns no precip.
@@ -132,6 +140,22 @@ while [[ $# -gt 0 ]]; do
             NETWORK_ZOOM="$2"
             shift 2
             ;;
+        --network-size)
+            NETWORK_SIZE="$2"
+            shift 2
+            ;;
+        --network-cell-pixels)
+            NETWORK_CELL_PIXELS="$2"
+            shift 2
+            ;;
+        --network-min-coverage)
+            NETWORK_MIN_COVERAGE="$2"
+            shift 2
+            ;;
+        --network-smooth)
+            NETWORK_SMOOTH="$2"
+            shift 2
+            ;;
         --no-rf)
             NO_RF=1
             shift
@@ -195,6 +219,10 @@ args=(
     --min-interval "${MIN_INTERVAL}"
     --max-interval "${MAX_INTERVAL}"
     --network-zoom "${NETWORK_ZOOM}"
+    --network-size "${NETWORK_SIZE}"
+    --network-cell-pixels "${NETWORK_CELL_PIXELS}"
+    --network-min-coverage "${NETWORK_MIN_COVERAGE}"
+    --network-smooth "${NETWORK_SMOOTH}"
 )
 
 if [[ -n "${WEATHER_BBOX}" ]]; then

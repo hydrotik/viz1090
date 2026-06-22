@@ -58,6 +58,7 @@ test-weather:
 	python3 -m unittest tests.test_weather_fixture
 	python3 -m unittest tests.test_network_weather
 	python3 -m unittest tests.test_uat_weather_cycle
+	python3 -m unittest tests.test_weather_hybrid_cycle
 
 test-tiles:
 	python3 -m unittest tests.test_inspect_mbtiles
