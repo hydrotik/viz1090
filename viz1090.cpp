@@ -83,6 +83,7 @@ void showHelp(void) {
 "--tile-max-zoom <z>              Maximum raster tile zoom (default: 17)\n"
 "--tile-zoom-offset <n>           Adjust chosen raster tile zoom (default: 0)\n"
 "--tile-min-bytes <n>             Skip tiny MBTiles placeholders below n bytes (default: 2048)\n"
+"--tile-opacity <0-255>           Raster tile opacity (default: 204, 80%)\n"
 "--uiscale <factor>               UI global scaling (default: 1)\n"  
 "--weather-file <path>            Radar tile cache file to render\n"
 "--weather-min-pixels <n>         Minimum rendered radar cell size (default: 3)\n"
@@ -201,6 +202,13 @@ int main(int argc, char **argv) {
             requireArgs(argc, j, 1, argv[j]);
             if(!parseIntArg(argv[++j], &view.raster_tile_min_bytes) || view.raster_tile_min_bytes < 0 || view.raster_tile_min_bytes > 1000000) {
                 fprintf(stderr, "Invalid tile min bytes '%s'. Expected 0 to 1000000.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--tile-opacity")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.raster_tile_opacity) || view.raster_tile_opacity < 0 || view.raster_tile_opacity > 255) {
+                fprintf(stderr, "Invalid tile opacity '%s'. Expected 0 to 255.\n\n", argv[j]);
                 showHelp();
                 exit(1);
             }

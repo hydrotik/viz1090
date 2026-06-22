@@ -1071,6 +1071,8 @@ void View::drawRasterTiles() {
             dest.y = std::min(y1, y2);
             dest.w = std::max(1, std::abs(x2 - x1) + 1);
             dest.h = std::max(1, std::abs(y2 - y1) + 1);
+            SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureAlphaMod(texture, static_cast<Uint8>(clampInt(raster_tile_opacity, 0, 255)));
             SDL_RenderCopy(renderer, texture, NULL, &dest);
         }
     }
@@ -1208,18 +1210,18 @@ void View::drawGeography() {
 
 static SDL_Color weatherColorForIntensity(int intensity) {
     if(intensity >= 4) {
-        return {255, 40, 255, 205};
+        return {255, 40, 255, 185};
     }
 
     if(intensity == 3) {
-        return {255, 50, 35, 190};
+        return {255, 50, 35, 165};
     }
 
     if(intensity == 2) {
-        return {255, 220, 0, 160};
+        return {255, 220, 0, 135};
     }
 
-    return {35, 255, 85, 105};
+    return {35, 255, 85, 80};
 }
 
 void View::loadWeatherTiles() {
@@ -2064,6 +2066,7 @@ View::View(AppData *appData){
     raster_tile_max_zoom    = 17;
     raster_tile_zoom_offset = 0;
     raster_tile_min_bytes   = 2048;
+    raster_tile_opacity     = 204;
     raster_tile_cache_limit = 192;
     raster_tile_clock       = 0;
     raster_tile_warning_shown = false;

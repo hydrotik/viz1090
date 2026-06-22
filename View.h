@@ -229,6 +229,7 @@ class View {
 	    int raster_tile_max_zoom;
 	    int raster_tile_zoom_offset;
 	    int raster_tile_min_bytes;
+	    int raster_tile_opacity;
 	    int raster_tile_cache_limit;
 	    int raster_tile_clock;
 	    bool raster_tile_warning_shown;

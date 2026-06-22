@@ -27,6 +27,7 @@ TILE_MIN_ZOOM="0"
 TILE_MAX_ZOOM="17"
 TILE_ZOOM_OFFSET="0"
 TILE_MIN_BYTES="2048"
+TILE_OPACITY="204"
 TILE_USABLE=1
 TOLERANCE="0.001"
 MINPOP="100000"
@@ -78,6 +79,7 @@ Options:
   --tile-max-zoom <z> Maximum raster tile zoom. Default: 17
   --tile-zoom-offset <n> Adjust selected raster tile zoom. Default: 0
   --tile-min-bytes <n> Skip tiny MBTiles placeholders below n bytes. Default: 2048
+  --tile-opacity <0-255> Raster basemap opacity. Default: 204
   --uiscale <value>   UI scale. Default: 1
   --plane-scale <n>   Aircraft icon scale. Default: 1.5
   --label-scale <n>   Aircraft label scale. Default: 1.9
@@ -286,6 +288,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --tile-min-bytes)
             TILE_MIN_BYTES="$2"
+            shift 2
+            ;;
+        --tile-opacity)
+            TILE_OPACITY="$2"
             shift 2
             ;;
         --uiscale)
@@ -502,6 +508,7 @@ if [[ -n "${TILE_SOURCE}" && -e "${TILE_SOURCE}" && "${TILE_USABLE}" -eq 1 ]]; t
         --tile-max-zoom "${TILE_MAX_ZOOM}"
         --tile-zoom-offset "${TILE_ZOOM_OFFSET}"
         --tile-min-bytes "${TILE_MIN_BYTES}"
+        --tile-opacity "${TILE_OPACITY}"
     )
 fi
 

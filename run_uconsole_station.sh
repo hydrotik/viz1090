@@ -19,6 +19,7 @@ WEATHER_INTERVAL="300"
 WEATHER_MIN_PIXELS="3"
 TILE_MAX_ZOOM="13"
 TILE_MIN_BYTES="2048"
+TILE_OPACITY="204"
 WEATHER=1
 RF_WEATHER=0
 GPS=1
@@ -59,6 +60,7 @@ Options:
   --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 3
   --tile-max-zoom <z>         Maximum raster basemap zoom. Default: 13
   --tile-min-bytes <n>        Skip tiny MBTiles placeholders below n bytes. Default: 2048
+  --tile-opacity <0-255>      Raster basemap opacity. Default: 204
   --rf-weather                Try RF UAT/FIS-B before network fallback.
   --no-weather                Start app without the weather updater.
   --debug-weather             Print radar load/render diagnostics.
@@ -150,6 +152,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --tile-min-bytes)
             TILE_MIN_BYTES="$2"
+            shift 2
+            ;;
+        --tile-opacity)
+            TILE_OPACITY="$2"
             shift 2
             ;;
         --rf-weather)
@@ -270,6 +276,7 @@ app_args=(
     --weather-min-pixels "${WEATHER_MIN_PIXELS}"
     --tile-max-zoom "${TILE_MAX_ZOOM}"
     --tile-min-bytes "${TILE_MIN_BYTES}"
+    --tile-opacity "${TILE_OPACITY}"
 )
 
 if [[ "${USE_TILES}" -eq 1 && -n "${TILES}" ]]; then
