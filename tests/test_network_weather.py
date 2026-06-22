@@ -49,6 +49,24 @@ class NetworkWeatherTests(unittest.TestCase):
             "https://tilecache.rainviewer.com/v2/radar/example/512/7/40.70000/-73.80000/2/1_1.png",
         )
 
+    def test_rainviewer_xyz_tile_url_uses_standard_tile(self):
+        metadata = {"host": "https://tilecache.rainviewer.com/"}
+        frame = {"path": "/v2/radar/example"}
+
+        url = network_weather.rainviewer_xyz_tile_url(metadata, frame, 18, 23, 6, 512, 2, 1, 1)
+
+        self.assertEqual(
+            url,
+            "https://tilecache.rainviewer.com/v2/radar/example/512/6/18/23/2/1_1.png",
+        )
+
+    def test_tile_ranges_for_bbox_include_cleveland_area(self):
+        x_range, y_range = network_weather.tile_ranges_for_bbox((-125, 24, -66, 50), 5)
+        cleveland_x, cleveland_y = network_weather.tile_xy_for_lon_lat(-81.6944, 41.4993, 5)
+
+        self.assertIn(cleveland_x, list(x_range))
+        self.assertIn(cleveland_y, list(y_range))
+
     def test_decode_png_rgba(self):
         png = make_rgba_png(1, 1, [[(10, 20, 30, 40)]])
 
@@ -67,6 +85,26 @@ class NetworkWeatherTests(unittest.TestCase):
 
         self.assertEqual(len(tiles), 2)
         self.assertTrue(all(tile[4] == 1 for tile in tiles))
+
+    def test_tiles_from_image_at_origin_uses_tile_origin(self):
+        pixels = [[(0, 180, 60, 180)]]
+        x, y = network_weather.tile_xy_for_lon_lat(-81.6944, 41.4993, 5)
+
+        tiles = network_weather.tiles_from_image_at_origin(1, 1, pixels, x * 512, y * 512, 5, 512, 1, 0.5)
+
+        self.assertEqual(len(tiles), 1)
+        self.assertGreaterEqual(tiles[0][1], -90.0)
+        self.assertLessEqual(tiles[0][1], -75.0)
+
+    def test_clip_tiles_to_bbox(self):
+        tiles = [
+            (23.5, -80.0, 24.5, -79.0, 1),
+            (51.0, -80.0, 52.0, -79.0, 1),
+        ]
+
+        clipped = network_weather.clip_tiles_to_bbox(tiles, (-125, 24, -66, 50))
+
+        self.assertEqual(clipped, [(24, -80.0, 24.5, -79.0, 1)])
 
 
 if __name__ == "__main__":

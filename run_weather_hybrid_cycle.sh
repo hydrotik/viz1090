@@ -14,6 +14,8 @@ SDR="driver=rtlsdr,serial=25062501"
 RF_DURATION="90"
 MIN_INTERVAL="240"
 MAX_INTERVAL="1800"
+WEATHER_BBOX="-125,24,-66,50"
+NETWORK_ZOOM="5"
 NETWORK=1
 NO_RF=0
 NETWORK_PRESERVE_EMPTY=0
@@ -43,6 +45,10 @@ Options:
   --rf-duration <sec>    UAT/FIS-B sample window. Default: 90
   --min-interval <sec>   Minimum repeat interval. Default: 240
   --max-interval <sec>   Maximum RF retry interval after misses. Default: 1800
+  --weather-bbox <bbox>  Network radar bbox lon_min,lat_min,lon_max,lat_max.
+                         Default: -125,24,-66,50
+  --local-weather        Fetch network radar around current location instead of bbox.
+  --network-zoom <z>     Network radar zoom. Default: 5 for bbox coverage.
   --no-rf                Skip UAT/FIS-B and fetch network radar only.
   --no-network           Do not use internet fallback.
   --network-preserve-empty Preserve existing radar cache when network returns no precip.
@@ -113,6 +119,19 @@ while [[ $# -gt 0 ]]; do
             MAX_INTERVAL="$2"
             shift 2
             ;;
+        --weather-bbox)
+            WEATHER_BBOX="$2"
+            shift 2
+            ;;
+        --local-weather)
+            WEATHER_BBOX=""
+            NETWORK_ZOOM="7"
+            shift
+            ;;
+        --network-zoom)
+            NETWORK_ZOOM="$2"
+            shift 2
+            ;;
         --no-rf)
             NO_RF=1
             shift
@@ -175,8 +194,12 @@ args=(
     --rf-duration "${RF_DURATION}"
     --min-interval "${MIN_INTERVAL}"
     --max-interval "${MAX_INTERVAL}"
+    --network-zoom "${NETWORK_ZOOM}"
 )
 
+if [[ -n "${WEATHER_BBOX}" ]]; then
+    args+=("--weather-bbox=${WEATHER_BBOX}")
+fi
 if [[ "${ONCE}" -eq 1 ]]; then
     args+=(--once)
 fi

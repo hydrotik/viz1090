@@ -47,7 +47,11 @@ def run_network(args):
         str(args.lon),
         "--output",
         args.weather_file,
+        "--zoom",
+        str(args.network_zoom),
     ]
+    if args.weather_bbox:
+        command.append("--bbox=%s" % args.weather_bbox)
     if args.network_preserve_empty:
         command.append("--preserve-empty")
     return run_command(command)
@@ -98,6 +102,8 @@ def build_parser():
     parser.add_argument("--max-interval", type=int, default=1800)
     parser.add_argument("--network", action="store_true", default=True)
     parser.add_argument("--no-network", action="store_false", dest="network")
+    parser.add_argument("--network-zoom", type=int, default=5)
+    parser.add_argument("--weather-bbox", default="")
     parser.add_argument("--network-preserve-empty", action="store_true")
     parser.add_argument("--no-rf", action="store_true")
     parser.add_argument("--once", action="store_true")

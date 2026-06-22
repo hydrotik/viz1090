@@ -49,6 +49,24 @@ def rainviewer_tile_url(metadata, frame, lat, lon, zoom, size, color, smooth, sn
     )
 
 
+def rainviewer_xyz_tile_url(metadata, frame, x, y, zoom, size, color, smooth, snow):
+    host = metadata.get("host")
+    path = frame.get("path")
+    if not host or not path:
+        raise ValueError("RainViewer metadata missing host/path")
+    return "%s%s/%d/%d/%d/%d/%d/%d_%d.png" % (
+        host.rstrip("/"),
+        path,
+        size,
+        zoom,
+        x,
+        y,
+        color,
+        smooth,
+        snow,
+    )
+
+
 def paeth(a, b, c):
     p = a + b - c
     pa = abs(p - a)
@@ -190,6 +208,73 @@ def pixel_to_lon_lat(px, py, center_lat, center_lon, zoom, size):
     return world_x_to_lon(world_x, zoom, size), world_y_to_lat(world_y, zoom, size)
 
 
+def tile_xy_for_lon_lat(lon, lat, zoom):
+    count = 2**zoom
+    x = int(math.floor((lon + 180.0) / 360.0 * count))
+    sin_lat = math.sin(math.radians(max(-85.05112878, min(85.05112878, lat))))
+    y = int(math.floor((0.5 - math.log((1 + sin_lat) / (1 - sin_lat)) / (4 * math.pi)) * count))
+    return max(0, min(count - 1, x)), max(0, min(count - 1, y))
+
+
+def tile_ranges_for_bbox(bbox, zoom):
+    lon_min, lat_min, lon_max, lat_max = bbox
+    if lon_min > lon_max:
+        lon_min, lon_max = lon_max, lon_min
+    if lat_min > lat_max:
+        lat_min, lat_max = lat_max, lat_min
+
+    x_min, y_max = tile_xy_for_lon_lat(lon_min, lat_min, zoom)
+    x_max, y_min = tile_xy_for_lon_lat(lon_max, lat_max, zoom)
+
+    if x_min > x_max:
+        x_min, x_max = x_max, x_min
+    if y_min > y_max:
+        y_min, y_max = y_max, y_min
+
+    return range(x_min, x_max + 1), range(y_min, y_max + 1)
+
+
+def parse_bbox(value):
+    parts = [part.strip() for part in value.split(",")]
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("bbox must be lon_min,lat_min,lon_max,lat_max")
+    try:
+        lon_min, lat_min, lon_max, lat_max = [float(part) for part in parts]
+    except ValueError:
+        raise argparse.ArgumentTypeError("bbox values must be numeric")
+    if not (-180.0 <= lon_min <= 180.0 and -180.0 <= lon_max <= 180.0):
+        raise argparse.ArgumentTypeError("bbox longitude values must be between -180 and 180")
+    if not (-90.0 <= lat_min <= 90.0 and -90.0 <= lat_max <= 90.0):
+        raise argparse.ArgumentTypeError("bbox latitude values must be between -90 and 90")
+    return lon_min, lat_min, lon_max, lat_max
+
+
+def clip_tiles_to_bbox(tiles, bbox):
+    lon_min, lat_min, lon_max, lat_max = bbox
+    if lon_min > lon_max:
+        lon_min, lon_max = lon_max, lon_min
+    if lat_min > lat_max:
+        lat_min, lat_max = lat_max, lat_min
+
+    clipped = []
+    for tile in tiles:
+        tile_lat_min, tile_lon_min, tile_lat_max, tile_lon_max, intensity = tile
+        if tile_lat_max < lat_min or tile_lat_min > lat_max:
+            continue
+        if tile_lon_max < lon_min or tile_lon_min > lon_max:
+            continue
+        clipped.append(
+            (
+                max(tile_lat_min, lat_min),
+                max(tile_lon_min, lon_min),
+                min(tile_lat_max, lat_max),
+                min(tile_lon_max, lon_max),
+                intensity,
+            )
+        )
+    return clipped
+
+
 def classify_intensity(r, g, b, a):
     if a < 16:
         return 0
@@ -214,6 +299,14 @@ def classify_intensity(r, g, b, a):
 
 
 def tiles_from_image(width, height, pixels, center_lat, center_lon, zoom, size, cell_pixels, min_coverage):
+    center_x = lon_to_world_x(center_lon, zoom, size)
+    center_y = lat_to_world_y(center_lat, zoom, size)
+    origin_x = center_x - size / 2.0
+    origin_y = center_y - size / 2.0
+    return tiles_from_image_at_origin(width, height, pixels, origin_x, origin_y, zoom, size, cell_pixels, min_coverage)
+
+
+def tiles_from_image_at_origin(width, height, pixels, origin_x, origin_y, zoom, size, cell_pixels, min_coverage):
     tiles = []
 
     for y in range(0, height, cell_pixels):
@@ -241,10 +334,10 @@ def tiles_from_image(width, height, pixels, center_lat, center_lon, zoom, size, 
             if intensity < 1:
                 continue
 
-            lon1, lat1 = pixel_to_lon_lat(x, y, center_lat, center_lon, zoom, size)
-            lon2, lat2 = pixel_to_lon_lat(
-                min(x + cell_pixels, width), min(y + cell_pixels, height), center_lat, center_lon, zoom, size
-            )
+            lon1 = world_x_to_lon(origin_x + x, zoom, size)
+            lat1 = world_y_to_lat(origin_y + y, zoom, size)
+            lon2 = world_x_to_lon(origin_x + min(x + cell_pixels, width), zoom, size)
+            lat2 = world_y_to_lat(origin_y + min(y + cell_pixels, height), zoom, size)
             tiles.append((min(lat1, lat2), min(lon1, lon2), max(lat1, lat2), max(lon1, lon2), intensity))
 
     return tiles
@@ -273,6 +366,37 @@ def write_tiles(path, tiles, metadata, frame, source_url, preserve_empty=False):
 def fetch_rainviewer(args):
     metadata = json.loads(fetch_url(args.api_url, args.timeout).decode("utf-8"))
     frame = latest_radar_frame(metadata)
+
+    if args.bbox:
+        tiles = []
+        urls = []
+        x_range, y_range = tile_ranges_for_bbox(args.bbox, args.zoom)
+        for x in x_range:
+            for y in y_range:
+                tile_url = rainviewer_xyz_tile_url(
+                    metadata, frame, x, y, args.zoom, args.size, args.color, args.smooth, args.snow
+                )
+                image_data = fetch_url(tile_url, args.timeout)
+                width, height, pixels = decode_png_rgba(image_data)
+                tiles.extend(
+                    tiles_from_image_at_origin(
+                        width,
+                        height,
+                        pixels,
+                        x * args.size,
+                        y * args.size,
+                        args.zoom,
+                        args.size,
+                        args.cell_pixels,
+                        args.min_coverage,
+                    )
+                )
+                urls.append(tile_url)
+
+        tiles = clip_tiles_to_bbox(tiles, args.bbox)
+        source_url = "bbox=%s tiles=%d" % (",".join("%.5f" % value for value in args.bbox), len(urls))
+        return write_tiles(Path(args.output), tiles, metadata, frame, source_url, args.preserve_empty)
+
     tile_url = rainviewer_tile_url(
         metadata, frame, args.lat, args.lon, args.zoom, args.size, args.color, args.smooth, args.snow
     )
@@ -294,8 +418,9 @@ def fetch_rainviewer(args):
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Fetch internet radar data into viz1090 radar tile cache")
-    parser.add_argument("--lat", type=float, required=True)
-    parser.add_argument("--lon", type=float, required=True)
+    parser.add_argument("--lat", type=float, default=40.723972)
+    parser.add_argument("--lon", type=float, default=-73.845139)
+    parser.add_argument("--bbox", type=parse_bbox, help="lon_min,lat_min,lon_max,lat_max area to fetch with XYZ tiles")
     parser.add_argument("--output", default="weather/radar_tiles.csv")
     parser.add_argument("--api-url", default=RAINVIEWER_API)
     parser.add_argument("--zoom", type=int, default=7)
