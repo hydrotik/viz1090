@@ -73,6 +73,7 @@ void showHelp(void) {
 "--theme <classic|atc|map|light>  Set UI/map color theme (default: classic)\n"
 "--tiles <path>                   Offline raster tiles: MBTiles file or z/x/y tile directory\n"
 "--tiles-mode <auto|mbtiles|xyz|tms> Raster tile source type (default: auto)\n"
+"--tile-theme <auto|light|dark>    Raster tile color treatment (default: auto)\n"
 "--tile-min-zoom <z>              Minimum raster tile zoom (default: 0)\n"
 "--tile-max-zoom <z>              Maximum raster tile zoom (default: 17)\n"
 "--tile-zoom-offset <n>           Adjust chosen raster tile zoom (default: 0)\n"
@@ -157,6 +158,16 @@ int main(int argc, char **argv) {
                 exit(1);
             }
             view.raster_tile_mode = mode;
+            view.mapRedraw = 1;
+        } else if (!strcmp(argv[j],"--tile-theme")) {
+            requireArgs(argc, j, 1, argv[j]);
+            const char *theme = argv[++j];
+            if(strcmp(theme, "auto") && strcmp(theme, "light") && strcmp(theme, "dark")) {
+                fprintf(stderr, "Invalid tile theme '%s'. Expected auto, light, or dark.\n\n", theme);
+                showHelp();
+                exit(1);
+            }
+            view.raster_tile_theme = !strcmp(theme, "light") ? "normal" : theme;
             view.mapRedraw = 1;
         } else if (!strcmp(argv[j],"--tile-min-zoom")) {
             requireArgs(argc, j, 1, argv[j]);

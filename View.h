@@ -123,6 +123,8 @@ class View {
 		void drawTrails(int left, int top, int right, int bottom);
 		void drawScaleBars();
 		void drawRasterTiles();
+		bool rasterTileDarkMode() const;
+		SDL_Surface *prepareRasterTileSurface(SDL_Surface *surface);
 		SDL_Texture *loadRasterTile(int z, int x, int y);
 		SDL_Texture *loadRasterTileFromDirectory(int z, int x, int y, const std::string &key, bool *missing);
 		SDL_Texture *loadRasterTileFromMbtiles(int z, int x, int y, const std::string &key, bool *missing);
@@ -209,6 +211,7 @@ class View {
 	    std::chrono::high_resolution_clock::time_point lastWeatherLoad;
 	    std::string raster_tile_source;
 	    std::string raster_tile_mode;
+	    std::string raster_tile_theme;
 	    int raster_tile_min_zoom;
 	    int raster_tile_max_zoom;
 	    int raster_tile_zoom_offset;

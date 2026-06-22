@@ -404,6 +404,7 @@ viz1090 will open an SDL window set to the resolution of your screen.
 | --status-scale [factor]       | Scale the bottom status strip independently from the rest of the UI |
 | --tiles [path]                | Render an offline raster basemap under the vector/weather/aircraft overlays. Supports MBTiles files or z/x/y tile directories when optional tile dependencies are installed. |
 | --tiles-mode [auto/mbtiles/xyz/tms] | Select raster tile source type. `auto` treats `.mbtiles` paths as MBTiles and other paths as xyz directories. |
+| --tile-theme [auto/light/dark] | Select raster tile color treatment. `auto` follows the app light/dark toggle, `dark` transforms light raster tiles into a dark aviation-style basemap, and `light` keeps the original tile colors. |
 | --tile-min-zoom [z]           | Minimum raster tile zoom. Default: 0 |
 | --tile-max-zoom [z]           | Maximum raster tile zoom. Default: 17 |
 | --tile-zoom-offset [n]        | Offset the automatically selected raster tile zoom, useful when a basemap looks too soft or too detailed. |

@@ -21,6 +21,7 @@ LABEL_SCALE="1.9"
 STATUS_SCALE="1.8"
 TILE_SOURCE=""
 TILE_MODE="auto"
+TILE_THEME="auto"
 TILE_MIN_ZOOM="0"
 TILE_MAX_ZOOM="17"
 TILE_ZOOM_OFFSET="0"
@@ -65,6 +66,7 @@ Options:
                       Default tile source: mapdata/tiles/us.mbtiles
   --tiles <path>      Offline raster tiles: MBTiles file or z/x/y tile directory.
   --tiles-mode <mode> auto, mbtiles, xyz, or tms. Default: auto
+  --tile-theme <mode> auto, light, or dark. Default: auto
   --tile-min-zoom <z> Minimum raster tile zoom. Default: 0
   --tile-max-zoom <z> Maximum raster tile zoom. Default: 17
   --tile-zoom-offset <n> Adjust selected raster tile zoom. Default: 0
@@ -250,6 +252,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --tiles-mode)
             TILE_MODE="$2"
+            shift 2
+            ;;
+        --tile-theme)
+            TILE_THEME="$2"
             shift 2
             ;;
         --tile-min-zoom)
@@ -448,6 +454,7 @@ if [[ -n "${TILE_SOURCE}" && -e "${TILE_SOURCE}" && "${TILE_USABLE}" -eq 1 ]]; t
     viz_args+=(
         --tiles "${TILE_SOURCE}"
         --tiles-mode "${TILE_MODE}"
+        --tile-theme "${TILE_THEME}"
         --tile-min-zoom "${TILE_MIN_ZOOM}"
         --tile-max-zoom "${TILE_MAX_ZOOM}"
         --tile-zoom-offset "${TILE_ZOOM_OFFSET}"

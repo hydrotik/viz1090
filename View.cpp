@@ -777,6 +777,55 @@ void View::clearRasterTileCache() {
     raster_tile_cache.clear();
 }
 
+bool View::rasterTileDarkMode() const {
+    return raster_tile_theme == "dark" || (raster_tile_theme == "auto" && !light_mode);
+}
+
+SDL_Surface *View::prepareRasterTileSurface(SDL_Surface *surface) {
+    if(!surface) {
+        return NULL;
+    }
+
+    if(!rasterTileDarkMode()) {
+        return surface;
+    }
+
+    SDL_Surface *converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+    SDL_FreeSurface(surface);
+    if(!converted) {
+        return NULL;
+    }
+
+    if(SDL_MUSTLOCK(converted) && SDL_LockSurface(converted) != 0) {
+        SDL_FreeSurface(converted);
+        return NULL;
+    }
+
+    for(int y = 0; y < converted->h; y++) {
+        Uint32 *row = reinterpret_cast<Uint32*>(static_cast<Uint8*>(converted->pixels) + y * converted->pitch);
+        for(int x = 0; x < converted->w; x++) {
+            Uint8 r, g, b, a;
+            SDL_GetRGBA(row[x], converted->format, &r, &g, &b, &a);
+            if(a == 0) {
+                continue;
+            }
+
+            int luma = (static_cast<int>(r) * 30 + static_cast<int>(g) * 59 + static_cast<int>(b) * 11) / 100;
+            int ink = 255 - luma;
+            Uint8 nr = static_cast<Uint8>(std::min(255, 10 + ink * 130 / 255));
+            Uint8 ng = static_cast<Uint8>(std::min(255, 18 + ink * 160 / 255));
+            Uint8 nb = static_cast<Uint8>(std::min(255, 22 + ink * 180 / 255));
+            row[x] = SDL_MapRGBA(converted->format, nr, ng, nb, a);
+        }
+    }
+
+    if(SDL_MUSTLOCK(converted)) {
+        SDL_UnlockSurface(converted);
+    }
+
+    return converted;
+}
+
 SDL_Texture *View::loadRasterTileFromDirectory(int z, int x, int y, const std::string &key, bool *missing) {
 #ifndef HAVE_SDL2_IMAGE
     (void)z;
@@ -802,7 +851,12 @@ SDL_Texture *View::loadRasterTileFromDirectory(int z, int x, int y, const std::s
             continue;
         }
 
-        SDL_Texture *texture = IMG_LoadTexture(renderer, path.c_str());
+        SDL_Surface *surface = IMG_Load(path.c_str());
+        surface = prepareRasterTileSurface(surface);
+        SDL_Texture *texture = surface ? SDL_CreateTextureFromSurface(renderer, surface) : NULL;
+        if(surface) {
+            SDL_FreeSurface(surface);
+        }
         if(texture) {
             *missing = false;
             SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
@@ -854,6 +908,7 @@ SDL_Texture *View::loadRasterTileFromMbtiles(int z, int x, int y, const std::str
         if(blob && blobSize > 0) {
             SDL_RWops *rw = SDL_RWFromConstMem(blob, blobSize);
             SDL_Surface *surface = rw ? IMG_Load_RW(rw, 1) : NULL;
+            surface = prepareRasterTileSurface(surface);
             if(surface) {
                 texture = SDL_CreateTextureFromSurface(renderer, surface);
                 SDL_FreeSurface(surface);
@@ -886,7 +941,7 @@ SDL_Texture *View::loadRasterTile(int z, int x, int y) {
     x = ((x % (maxTile + 1)) + (maxTile + 1)) % (maxTile + 1);
 
     std::ostringstream keyBuilder;
-    keyBuilder << z << "/" << x << "/" << y;
+    keyBuilder << z << "/" << x << "/" << y << "/" << (rasterTileDarkMode() ? "dark" : "normal");
     std::string key = keyBuilder.str();
 
     raster_tile_clock++;
@@ -1747,6 +1802,7 @@ View::View(AppData *appData){
     weather_file            = "";
     raster_tile_source      = "";
     raster_tile_mode        = "auto";
+    raster_tile_theme       = "auto";
     raster_tile_min_zoom    = 0;
     raster_tile_max_zoom    = 17;
     raster_tile_zoom_offset = 0;
