@@ -38,7 +38,7 @@ def detect_blob_format(blob):
 
 def read_metadata(conn):
     metadata = {}
-    rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    rows = conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')").fetchall()
     tables = {row[0] for row in rows}
     if "metadata" not in tables:
         return metadata, tables

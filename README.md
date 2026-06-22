@@ -171,6 +171,64 @@ python3 tools/inspect_mbtiles.py path/to/downloaded.mbtiles
 
 The result must say `usable raster MBTiles for viz1090`. If it says vector, render/export it to raster MBTiles first with MapTiler Engine, TileServer GL, or another OpenMapTiles-compatible renderer.
 
+The repeatable OpenMapTiles workflow is:
+
+1. Get an OpenMapTiles-compatible vector MBTiles extract for the region you want.
+2. Run a local renderer such as TileServer GL on the Mac:
+
+```
+mkdir -p mapdata/tiles
+docker run --rm -it \
+  -v "$PWD/mapdata/tiles:/data" \
+  -p 8080:8080 \
+  maptiler/tileserver-gl:latest \
+  --file /data/source/osm-2020-02-10-v3.11_north-america_us.mbtiles
+```
+
+Open `http://127.0.0.1:8080` and confirm the map renders. The stock TileServer GL raster endpoint is usually `http://127.0.0.1:8080/styles/basic-preview/{z}/{x}/{y}.png`; if the style name differs, use the style path shown by the TileServer GL page.
+
+3. In another terminal, package the rendered raster tiles into a viz1090 MBTiles file:
+
+```
+python3 tools/build_raster_mbtiles.py \
+  --tile-url 'http://127.0.0.1:8080/styles/basic-preview/{z}/{x}/{y}.png' \
+  --bbox=-82,36,-65,48.5 \
+  --min-zoom 0 \
+  --max-zoom 12 \
+  --output mapdata/tiles/northeast-raster.mbtiles \
+  --name 'Northeast OpenMapTiles raster' \
+  --force
+```
+
+Use `--dry-run` first to estimate tile count. Do not start with the whole US at high zoom; tile counts grow by roughly 4x per zoom level. Northeast zoom 0-12 is a reasonable first target. Zoom 13+ should be done region-by-region after confirming disk and render time.
+
+For a sharper NYC-first test pack:
+
+```
+python3 tools/build_raster_mbtiles.py \
+  --tile-url 'http://127.0.0.1:8080/styles/basic-preview/{z}/{x}/{y}.png' \
+  --bbox=-75,39.8,-71.8,42.2 \
+  --min-zoom 0 \
+  --max-zoom 14 \
+  --output mapdata/tiles/nyc-raster.mbtiles \
+  --name 'NYC OpenMapTiles raster' \
+  --force
+```
+
+4. Verify and copy to the uConsole:
+
+```
+python3 tools/inspect_mbtiles.py mapdata/tiles/northeast-raster.mbtiles
+rsync -av mapdata/tiles/northeast-raster.mbtiles djdonovan@192.168.1.195:~/viz1090/mapdata/tiles/
+```
+
+5. Run on the uConsole:
+
+```
+cd ~/viz1090
+./run_uconsole.sh --osm-mode --tiles mapdata/tiles/northeast-raster.mbtiles
+```
+
 For the Organic Maps path, use Organic Maps as the primary offline map/navigation engine and run viz1090 as the ADS-B feed producer:
 
 ```

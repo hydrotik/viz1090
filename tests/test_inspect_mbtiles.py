@@ -53,6 +53,33 @@ class InspectMbtilesTests(unittest.TestCase):
             self.assertEqual(result["kind"], "vector")
             self.assertEqual(result["effective_format"], "pbf")
 
+    def test_normalized_mbtiles_view_is_supported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "normalized.mbtiles"
+            conn = sqlite3.connect(path)
+            try:
+                conn.execute("CREATE TABLE metadata (name TEXT, value TEXT)")
+                conn.execute("CREATE TABLE images (tile_id TEXT, tile_data BLOB)")
+                conn.execute("CREATE TABLE map (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_id TEXT)")
+                conn.execute(
+                    "CREATE VIEW tiles AS "
+                    "SELECT map.zoom_level AS zoom_level, map.tile_column AS tile_column, "
+                    "map.tile_row AS tile_row, images.tile_data AS tile_data "
+                    "FROM map JOIN images ON map.tile_id = images.tile_id"
+                )
+                conn.execute("INSERT INTO metadata VALUES (?, ?)", ("format", "pbf"))
+                conn.execute("INSERT INTO images VALUES (?, ?)", ("tile-1", b"\x1f\x8bcompressed-vector"))
+                conn.execute("INSERT INTO map VALUES (?, ?, ?, ?)", (3, 1, 2, "tile-1"))
+                conn.commit()
+            finally:
+                conn.close()
+
+            result = inspect_mbtiles.inspect_mbtiles(path)
+
+            self.assertFalse(result["usable"])
+            self.assertEqual(result["kind"], "vector")
+            self.assertEqual(result["count"], 1)
+
     def test_missing_tiles_table_is_invalid(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.mbtiles"
