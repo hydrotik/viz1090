@@ -16,6 +16,7 @@ MIN_INTERVAL="240"
 MAX_INTERVAL="1800"
 WEATHER_BBOX="-125,24,-66,50"
 NETWORK_ZOOM="5"
+NETWORK_MIN_ZOOM="5"
 NETWORK_SIZE="512"
 NETWORK_CELL_PIXELS="6"
 NETWORK_MIN_COVERAGE="0.15"
@@ -53,6 +54,7 @@ Options:
                          Default: -125,24,-66,50
   --local-weather        Fetch network radar around current location instead of bbox.
   --network-zoom <z>     Network radar zoom. Default: 5 for bbox coverage.
+  --network-min-zoom <z> Lowest network radar zoom fallback. Default: 5
   --network-size <px>    Network radar source tile size, 256 or 512. Default: 512
   --network-cell-pixels <n> Radar output cell size in source pixels. Default: 6
   --network-min-coverage <n> Minimum precipitation coverage per cell. Default: 0.15
@@ -140,6 +142,10 @@ while [[ $# -gt 0 ]]; do
             NETWORK_ZOOM="$2"
             shift 2
             ;;
+        --network-min-zoom)
+            NETWORK_MIN_ZOOM="$2"
+            shift 2
+            ;;
         --network-size)
             NETWORK_SIZE="$2"
             shift 2
@@ -219,6 +225,7 @@ args=(
     --min-interval "${MIN_INTERVAL}"
     --max-interval "${MAX_INTERVAL}"
     --network-zoom "${NETWORK_ZOOM}"
+    --network-min-zoom "${NETWORK_MIN_ZOOM}"
     --network-size "${NETWORK_SIZE}"
     --network-cell-pixels "${NETWORK_CELL_PIXELS}"
     --network-min-coverage "${NETWORK_MIN_COVERAGE}"

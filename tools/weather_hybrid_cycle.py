@@ -49,6 +49,8 @@ def run_network(args):
         args.weather_file,
         "--zoom",
         str(args.network_zoom),
+        "--min-zoom",
+        str(args.network_min_zoom),
         "--size",
         str(args.network_size),
         "--cell-pixels",
@@ -111,6 +113,7 @@ def build_parser():
     parser.add_argument("--network", action="store_true", default=True)
     parser.add_argument("--no-network", action="store_false", dest="network")
     parser.add_argument("--network-zoom", type=int, default=5)
+    parser.add_argument("--network-min-zoom", type=int, default=5)
     parser.add_argument("--network-size", type=int, choices=(256, 512), default=512)
     parser.add_argument("--network-cell-pixels", type=int, default=6)
     parser.add_argument("--network-min-coverage", type=float, default=0.15)

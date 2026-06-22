@@ -1,4 +1,5 @@
 import struct
+import tempfile
 import unittest
 import zlib
 
@@ -165,6 +166,56 @@ class NetworkWeatherTests(unittest.TestCase):
         clipped = network_weather.clip_tiles_to_bbox(tiles, (-125, 24, -66, 50))
 
         self.assertEqual(clipped, [(24, -80.0, 24.5, -79.0, 1)])
+
+    def test_fetch_rainviewer_falls_back_from_placeholder_zoom(self):
+        metadata = {"host": "https://tiles.example", "radar": {"past": [{"time": 1, "path": "/radar"}]}}
+        placeholder_pixels = [[(0, 0, 0, 255) for _ in range(4)] for _ in range(4)]
+        radar_pixels = [[(0, 180, 60, 180) for _ in range(4)] for _ in range(4)]
+        placeholder_png = make_rgba_png(4, 4, placeholder_pixels)
+        radar_png = make_rgba_png(4, 4, radar_pixels)
+        original_fetch = network_weather.fetch_url
+
+        def fake_fetch(url, timeout):
+            if url == network_weather.RAINVIEWER_API:
+                return __import__("json").dumps(metadata).encode("utf-8")
+            if "/8/" in url:
+                return placeholder_png
+            if "/7/" in url:
+                return radar_png
+            raise AssertionError("unexpected URL %s" % url)
+
+        try:
+            network_weather.fetch_url = fake_fetch
+            with tempfile.TemporaryDirectory() as tmp:
+                output = "%s/radar.csv" % tmp
+                args = network_weather.build_parser().parse_args(
+                    [
+                        "--lat",
+                        "40.7",
+                        "--lon",
+                        "-73.8",
+                        "--output",
+                        output,
+                        "--zoom",
+                        "8",
+                        "--min-zoom",
+                        "7",
+                        "--cell-pixels",
+                        "4",
+                        "--min-coverage",
+                        "0.1",
+                    ]
+                )
+
+                count = network_weather.fetch_rainviewer(args)
+
+                self.assertEqual(count, 1)
+                with open(output, "r", encoding="utf-8") as handle:
+                    contents = handle.read()
+                self.assertIn("/7/", contents)
+                self.assertIn(",1\n", contents)
+        finally:
+            network_weather.fetch_url = original_fetch
 
 
 if __name__ == "__main__":

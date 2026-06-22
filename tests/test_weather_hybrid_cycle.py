@@ -13,6 +13,7 @@ class WeatherHybridCycleTests(unittest.TestCase):
             weather_file="weather/radar_tiles.csv",
             network_script="tools/network_weather.py",
             network_zoom=8,
+            network_min_zoom=5,
             network_size=512,
             network_cell_pixels=3,
             network_min_coverage=0.08,
@@ -28,6 +29,8 @@ class WeatherHybridCycleTests(unittest.TestCase):
         command = run_command.call_args.args[0]
         self.assertIn("--zoom", command)
         self.assertIn("8", command)
+        self.assertIn("--min-zoom", command)
+        self.assertIn("5", command)
         self.assertIn("--cell-pixels", command)
         self.assertIn("3", command)
         self.assertIn("--min-coverage", command)

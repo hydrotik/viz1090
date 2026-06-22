@@ -210,6 +210,39 @@ python3 tools/build_raster_mbtiles.py \
 
 Use `--dry-run` first to estimate tile count. Do not start with the whole US at high zoom; tile counts grow by roughly 4x per zoom level. Northeast zoom 0-12 is a reasonable first target. Zoom 13+ should be done region-by-region after confirming disk and render time.
 
+For country-wide use, build one low-zoom overview pack and regional detail packs instead of one giant high-zoom national MBTiles file. The helper below uses the shared coverage profiles in `tools/coverage_profiles.py`:
+
+```
+python3 tools/build_map_tile_pack.py \
+  --tile-url 'http://127.0.0.1:8080/styles/basic-preview/{z}/{x}/{y}.png' \
+  --profiles all-us \
+  --dry-run
+```
+
+When the dry run looks reasonable and your local tile renderer is running, remove `--dry-run`:
+
+```
+python3 tools/build_map_tile_pack.py \
+  --tile-url 'http://127.0.0.1:8080/styles/basic-preview/{z}/{x}/{y}.png' \
+  --profiles all-us \
+  --force
+```
+
+The profile plan is tiered for uConsole performance: `conus-overview` covers the lower 48 at zoom 0-7, while `northeast`, `southeast`, `midwest`, `south-central`, `mountain-west`, and `west-coast` cover regional detail at zoom 0-12. Alaska, Hawaii, and Puerto Rico have smaller dedicated packs. The station launcher can auto-select the best installed pack for the configured/current location:
+
+```
+./run_uconsole_station.sh --map-tile-profile auto --weather-profile regional
+```
+
+To sync code and selected raster packs to the uConsole:
+
+```
+./deploy_uconsole.sh --tiles starter
+./deploy_uconsole.sh --tiles conus-regions
+```
+
+`starter` syncs the national overview, Northeast, and NYC packs when present. `conus-regions` syncs the lower-48 overview and the six regional packs. Missing packs are skipped, so it is safe to run before every region has been generated.
+
 For a sharper NYC-first test pack:
 
 ```
@@ -325,7 +358,7 @@ For continuous updates:
 ./run_weather_hybrid_cycle.sh
 ```
 
-The hybrid updater tries RF UAT first. When RF captures decode zero messages, it fetches internet radar into the same `weather/radar_tiles.csv` cache and increases the RF retry interval up to a maximum. `run_uconsole.sh` passes this weather file to viz1090 even before it exists, and the renderer reloads it every 30 seconds, so the updater can be started before or after the app. The network fallback defaults to a lower-48 bbox (`-125,24,-66,50`) so zoomed-out weather can appear away from the current receiver location. Use `--local-weather` for a smaller current-location fetch, or `--weather-bbox lon_min,lat_min,lon_max,lat_max` for a custom area. The network fallback currently uses RainViewer's public Weather Maps API, which is free for personal/educational/small community use, best-effort, and requires visible attribution: "Weather data by RainViewer".
+The hybrid updater tries RF UAT first. When RF captures decode zero messages, it fetches internet radar into the same `weather/radar_tiles.csv` cache and increases the RF retry interval up to a maximum. `run_uconsole.sh` passes this weather file to viz1090 even before it exists, and the renderer reloads it every 30 seconds, so the updater can be started before or after the app. The network fallback defaults to a lower-48 bbox (`-125,24,-66,50`) so zoomed-out weather can appear away from the current receiver location. Use `--local-weather` for a smaller current-location fetch, or `--weather-bbox lon_min,lat_min,lon_max,lat_max` for a custom area. The network fallback currently uses RainViewer's public Weather Maps API, which is free for personal/educational/small community use, best-effort, and requires visible attribution: "Weather data by RainViewer". The network updater retries lower zoom levels with `--network-min-zoom` when RainViewer returns unsupported placeholder tiles.
 
 For a sharper NYC-area radar overlay, use a smaller bbox with higher network zoom and smaller output cells:
 
@@ -348,6 +381,20 @@ The one-command equivalent for normal NYC/offline-raster use is:
 ```
 ./run_uconsole_station.sh --tiles mapdata/tiles/nyc-raster.mbtiles
 ```
+
+For normal field use with installed regional packs, prefer:
+
+```
+./run_uconsole_station.sh --map-tile-profile auto --weather-profile regional
+```
+
+Weather profiles:
+
+- `national`: lower-48 radar overview, lower update frequency, lower geometry count.
+- `regional`: region-sized radar around the configured/current location; default for the station launcher.
+- `local`: smaller higher-detail radar around the configured/current location.
+
+The station launcher defaults to supported RainViewer zoom fallback, so higher requested detail does not reintroduce the green "Zoom Level Not Supported" placeholder boxes.
 
 To diagnose the uConsole GPS path while the device sits near a window:
 

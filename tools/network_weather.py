@@ -405,62 +405,99 @@ def write_tiles(path, tiles, metadata, frame, source_url, preserve_empty=False):
     return len(tiles)
 
 
-def fetch_rainviewer(args):
-    metadata = json.loads(fetch_url(args.api_url, args.timeout).decode("utf-8"))
-    frame = latest_radar_frame(metadata)
-
-    if args.bbox:
-        tiles = []
-        urls = []
-        x_range, y_range = tile_ranges_for_bbox(args.bbox, args.zoom)
-        for x in x_range:
-            for y in y_range:
-                tile_url = rainviewer_xyz_tile_url(
-                    metadata, frame, x, y, args.zoom, args.size, args.color, args.smooth, args.snow
+def fetch_bbox_radar(args, metadata, frame, zoom):
+    tiles = []
+    urls = []
+    valid_images = 0
+    x_range, y_range = tile_ranges_for_bbox(args.bbox, zoom)
+    for x in x_range:
+        for y in y_range:
+            tile_url = rainviewer_xyz_tile_url(
+                metadata, frame, x, y, zoom, args.size, args.color, args.smooth, args.snow
+            )
+            image_data = fetch_url(tile_url, args.timeout)
+            width, height, pixels = decode_png_rgba(image_data)
+            if is_placeholder_tile(width, height, pixels):
+                print("skipping placeholder radar tile %s" % tile_url, file=sys.stderr)
+                continue
+            valid_images += 1
+            tiles.extend(
+                tiles_from_image_at_origin(
+                    width,
+                    height,
+                    pixels,
+                    x * args.size,
+                    y * args.size,
+                    zoom,
+                    args.size,
+                    args.cell_pixels,
+                    args.min_coverage,
                 )
-                image_data = fetch_url(tile_url, args.timeout)
-                width, height, pixels = decode_png_rgba(image_data)
-                if is_placeholder_tile(width, height, pixels):
-                    print("skipping placeholder radar tile %s" % tile_url, file=sys.stderr)
-                    continue
-                tiles.extend(
-                    tiles_from_image_at_origin(
-                        width,
-                        height,
-                        pixels,
-                        x * args.size,
-                        y * args.size,
-                        args.zoom,
-                        args.size,
-                        args.cell_pixels,
-                        args.min_coverage,
-                    )
-                )
-                urls.append(tile_url)
+            )
+            urls.append(tile_url)
 
-        tiles = clip_tiles_to_bbox(tiles, args.bbox)
-        source_url = "bbox=%s tiles=%d" % (",".join("%.5f" % value for value in args.bbox), len(urls))
-        return write_tiles(Path(args.output), tiles, metadata, frame, source_url, args.preserve_empty)
+    tiles = clip_tiles_to_bbox(tiles, args.bbox)
+    source_url = "bbox=%s zoom=%d tiles=%d" % (
+        ",".join("%.5f" % value for value in args.bbox),
+        zoom,
+        len(urls),
+    )
+    return valid_images, tiles, source_url
 
+
+def fetch_center_radar(args, metadata, frame, zoom):
     tile_url = rainviewer_tile_url(
-        metadata, frame, args.lat, args.lon, args.zoom, args.size, args.color, args.smooth, args.snow
+        metadata, frame, args.lat, args.lon, zoom, args.size, args.color, args.smooth, args.snow
     )
     image_data = fetch_url(tile_url, args.timeout)
     width, height, pixels = decode_png_rgba(image_data)
     if is_placeholder_tile(width, height, pixels):
-        return write_tiles(Path(args.output), [], metadata, frame, tile_url, args.preserve_empty)
+        print("skipping placeholder radar tile %s" % tile_url, file=sys.stderr)
+        return 0, [], tile_url
     tiles = tiles_from_image(
         width,
         height,
         pixels,
         args.lat,
         args.lon,
-        args.zoom,
+        zoom,
         args.size,
         args.cell_pixels,
         args.min_coverage,
     )
-    return write_tiles(Path(args.output), tiles, metadata, frame, tile_url, args.preserve_empty)
+    return 1, tiles, tile_url
+
+
+def fetch_rainviewer(args):
+    metadata = json.loads(fetch_url(args.api_url, args.timeout).decode("utf-8"))
+    frame = latest_radar_frame(metadata)
+    min_zoom = min(args.zoom, args.min_zoom)
+
+    for zoom in range(args.zoom, min_zoom - 1, -1):
+        if args.bbox:
+            valid_images, tiles, source_url = fetch_bbox_radar(args, metadata, frame, zoom)
+        else:
+            valid_images, tiles, source_url = fetch_center_radar(args, metadata, frame, zoom)
+
+        if valid_images > 0:
+            return write_tiles(Path(args.output), tiles, metadata, frame, source_url, args.preserve_empty)
+
+    if args.bbox:
+        tiles = []
+        source_url = "bbox=%s zoom=%d..%d placeholders_only" % (
+            ",".join("%.5f" % value for value in args.bbox),
+            args.zoom,
+            min_zoom,
+        )
+    else:
+        tiles = []
+        source_url = "center=%.5f,%.5f zoom=%d..%d placeholders_only" % (
+            args.lat,
+            args.lon,
+            args.zoom,
+            min_zoom,
+        )
+    return write_tiles(Path(args.output), tiles, metadata, frame, source_url, args.preserve_empty)
 
 
 def build_parser():
@@ -471,6 +508,7 @@ def build_parser():
     parser.add_argument("--output", default="weather/radar_tiles.csv")
     parser.add_argument("--api-url", default=RAINVIEWER_API)
     parser.add_argument("--zoom", type=int, default=7)
+    parser.add_argument("--min-zoom", type=int, default=5, help="Lowest zoom to retry when higher zoom returns placeholders")
     parser.add_argument("--size", type=int, choices=(256, 512), default=512)
     parser.add_argument("--color", type=int, default=2)
     parser.add_argument("--smooth", type=int, choices=(0, 1), default=1)

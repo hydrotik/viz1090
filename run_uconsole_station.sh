@@ -3,13 +3,19 @@ set -euo pipefail
 
 LAT="40.723972"
 LON="-73.845139"
-TILES="mapdata/tiles/nyc-raster.mbtiles"
+TILES=""
+TILES_DIR="mapdata/tiles"
 USE_TILES=1
+TILES_EXPLICIT=0
+MAP_TILE_PROFILE="auto"
 MAP_PROFILE="us-hd"
 WEATHER_BBOX="-75,39.8,-71.8,42.2"
+WEATHER_PROFILE="regional"
 NETWORK_ZOOM="6"
+NETWORK_MIN_ZOOM="5"
 NETWORK_CELL_PIXELS="3"
 NETWORK_MIN_COVERAGE="0.08"
+WEATHER_INTERVAL="300"
 WEATHER_MIN_PIXELS="3"
 TILE_MAX_ZOOM="13"
 TILE_MIN_BYTES="2048"
@@ -36,14 +42,18 @@ One-command uConsole workflow:
   5. stop the background weather updater when viz1090 exits
 
 Options:
-  --tiles <path>              Raster MBTiles file. Default: mapdata/tiles/nyc-raster.mbtiles
+  --tiles <path>              Raster MBTiles file. Overrides profile selection.
+  --tiles-dir <path>          Raster MBTiles directory. Default: mapdata/tiles
   --no-tiles                  Use generated vector map only.
+  --map-tile-profile <name>   auto, conus-overview, northeast, nyc, etc. Default: auto
   --map-profile <name>        Passed to run_uconsole.sh. Default: us-hd
   --lat <value>               Fallback latitude. Default: 40.723972
   --lon <value>               Fallback longitude. Default: -73.845139
   --gps / --no-gps            Let run_uconsole.sh try GPS. Default: --gps
-  --weather-bbox <bbox>       lon_min,lat_min,lon_max,lat_max. Default: NYC metro
-  --network-zoom <z>          RainViewer fetch zoom. Default: 6
+  --weather-profile <name>    auto/regional, national, local, or custom. Default: regional
+  --weather-bbox <bbox>       lon_min,lat_min,lon_max,lat_max. Overrides profile.
+  --network-zoom <z>          RainViewer fetch zoom. Default: profile-specific
+  --network-min-zoom <z>      Lowest fallback zoom if higher zoom is unsupported. Default: profile-specific
   --network-cell-pixels <n>   Radar output cell size. Default: 3
   --network-min-coverage <n>  Minimum precip coverage per cell. Default: 0.08
   --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 3
@@ -66,11 +76,20 @@ while [[ $# -gt 0 ]]; do
         --tiles)
             TILES="$2"
             USE_TILES=1
+            TILES_EXPLICIT=1
+            shift 2
+            ;;
+        --tiles-dir)
+            TILES_DIR="$2"
             shift 2
             ;;
         --no-tiles)
             USE_TILES=0
             shift
+            ;;
+        --map-tile-profile)
+            MAP_TILE_PROFILE="$2"
+            shift 2
             ;;
         --map-profile)
             MAP_PROFILE="$2"
@@ -94,18 +113,31 @@ while [[ $# -gt 0 ]]; do
             ;;
         --weather-bbox)
             WEATHER_BBOX="$2"
+            WEATHER_PROFILE="custom"
+            shift 2
+            ;;
+        --weather-profile)
+            WEATHER_PROFILE="$2"
             shift 2
             ;;
         --network-zoom)
             NETWORK_ZOOM="$2"
+            WEATHER_PROFILE="custom"
+            shift 2
+            ;;
+        --network-min-zoom)
+            NETWORK_MIN_ZOOM="$2"
+            WEATHER_PROFILE="custom"
             shift 2
             ;;
         --network-cell-pixels)
             NETWORK_CELL_PIXELS="$2"
+            WEATHER_PROFILE="custom"
             shift 2
             ;;
         --network-min-coverage)
             NETWORK_MIN_COVERAGE="$2"
+            WEATHER_PROFILE="custom"
             shift 2
             ;;
         --weather-min-pixels)
@@ -180,15 +212,43 @@ trap cleanup EXIT INT TERM
 make viz1090
 mkdir -p weather
 
+if [[ "${USE_TILES}" -eq 1 && "${TILES_EXPLICIT}" -eq 0 ]]; then
+    if [[ "${MAP_TILE_PROFILE}" == "auto" ]]; then
+        if selected="$(python3 tools/coverage_profiles.py select-map --lat "${LAT}" --lon "${LON}" --tiles-dir "${TILES_DIR}")"; then
+            TILES="${selected}"
+            echo "Selected raster map ${TILES}"
+        else
+            TILES=""
+            echo "No installed raster map profile matched; continuing with generated vector map only." >&2
+        fi
+    else
+        TILES="$(python3 tools/coverage_profiles.py map-path "${MAP_TILE_PROFILE}" --tiles-dir "${TILES_DIR}")"
+    fi
+fi
+
+if [[ "${WEATHER_PROFILE}" != "custom" ]]; then
+    while IFS='=' read -r key value; do
+        case "${key}" in
+            WEATHER_BBOX) WEATHER_BBOX="${value}" ;;
+            NETWORK_ZOOM) NETWORK_ZOOM="${value}" ;;
+            NETWORK_MIN_ZOOM) NETWORK_MIN_ZOOM="${value}" ;;
+            NETWORK_CELL_PIXELS) NETWORK_CELL_PIXELS="${value}" ;;
+            NETWORK_MIN_COVERAGE) NETWORK_MIN_COVERAGE="${value}" ;;
+            WEATHER_INTERVAL) WEATHER_INTERVAL="${value}" ;;
+        esac
+    done < <(python3 tools/coverage_profiles.py weather --profile "${WEATHER_PROFILE}" --lat "${LAT}" --lon "${LON}" --shell)
+fi
+
 weather_args=(
     --lat "${LAT}"
     --lon "${LON}"
     --weather-bbox="${WEATHER_BBOX}"
     --network-zoom "${NETWORK_ZOOM}"
+    --network-min-zoom "${NETWORK_MIN_ZOOM}"
     --network-cell-pixels "${NETWORK_CELL_PIXELS}"
     --network-min-coverage "${NETWORK_MIN_COVERAGE}"
-    --min-interval 300
-    --max-interval 300
+    --min-interval "${WEATHER_INTERVAL}"
+    --max-interval "${WEATHER_INTERVAL}"
 )
 
 if [[ "${RF_WEATHER}" -eq 0 ]]; then
@@ -212,7 +272,7 @@ app_args=(
     --tile-min-bytes "${TILE_MIN_BYTES}"
 )
 
-if [[ "${USE_TILES}" -eq 1 ]]; then
+if [[ "${USE_TILES}" -eq 1 && -n "${TILES}" ]]; then
     app_args=(
         --osm-mode
         --tiles "${TILES}"
