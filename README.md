@@ -90,10 +90,10 @@ For portable/offline use, run the download once, then reuse the cached sources:
 ./getmap.sh --offline --output-dir mapdata/generated/default
 ```
 
-For offline use across the United States, generate the national profile used by the uConsole wrapper:
+For offline use across the United States, generate the high-detail national profile used by the uConsole wrapper:
 
 ```
-./getmap.sh --output-dir mapdata/generated/us --bbox -180,17,-52,72 --roads --water --tolerance 0.001 --minpop 100000
+./getmap.sh --output-dir mapdata/generated/us-hd --bbox -180,17,-52,72 --roads --water --tolerance 0.0005 --minpop 50000
 ```
 
 On a ClockworkPi uConsole, the wrapper script builds if needed, generates this US map if missing, and launches the app with the recommended 1280x720 fullscreen settings:
@@ -124,18 +124,25 @@ The wrapper tries to read GPS first, then falls back to configured coordinates. 
 
 On HackerGadgets AIO V2 boards, GPS power is GPIO-controlled; the wrapper tries to enable GPIO 27 with `pinctrl` before reading GPS. Indoor GPS often fails to fix, especially after a cold start, so falling back to configured coordinates is expected indoors.
 
-The default `us` profile covers CONUS, Alaska, Hawaii, and Puerto Rico with one offline map. Far Pacific territories and the far western Aleutians require future multi-bbox/dateline-aware map generation.
+The default `us-hd` profile covers CONUS, Alaska, Hawaii, and Puerto Rico with one offline map at higher fidelity than the older `us` profile. Far Pacific territories and the far western Aleutians require future multi-bbox/dateline-aware map generation.
 
-For a more detailed local map, use a smaller profile or lower simplification tolerance:
-
-```
-./run_uconsole.sh --map-profile conus --regen-map --tolerance 0.0005
-```
-
-If you previously generated only the smaller NYC or Northeast map, force the new US map once:
+For a more detailed lower-48 map, use the `conus-hd` or `drive` profile:
 
 ```
-./run_uconsole.sh --map-profile us --regen-map
+./run_uconsole.sh --map-profile conus-hd --regen-map
+./run_uconsole.sh --map-profile drive --regen-map
+```
+
+For a larger, more readable in-car view, use car mode. It selects the `drive` map profile, the daylight map theme, larger aircraft labels, larger status text, and a longer GPS timeout:
+
+```
+./run_uconsole.sh --car-mode
+```
+
+If you previously generated only the smaller NYC or Northeast map, force the new high-detail US map once:
+
+```
+./run_uconsole.sh --map-profile us-hd --regen-map
 ```
 
 The uConsole wrapper also enlarges aircraft icons and aircraft labels by default. Tune those independently:
@@ -303,7 +310,7 @@ The bash script getmap.sh will download (so long as the links don't break) and c
 The generated map files can live outside the repository root. Use `--mapdir` when starting viz1090:
 
 ```
-./viz1090 --mapdir mapdata/generated/us --theme atc --lat 40.723972 --lon -73.845139
+./viz1090 --mapdir mapdata/generated/us-hd --theme atc --lat 40.723972 --lon -73.845139
 ```
 
 ### MAPCONVERTER.PY RUNTIME OPTIONS
@@ -315,7 +322,7 @@ The generated map files can live outside the repository root. Use `--mapdir` whe
 | --airportfile | shapefile for airport runway outlines |
 | --airportnames | shapefile for airport IATA names |
 | --minpop | minimum population to show place names for (defaults to 100000) |
-| --tolerance | map simplification tolerance (defaults to 0.001, which works well on a Raspberry Pi 4 - smaller values will produce more detail but slow down the map refresh rate) |
+| --tolerance | map simplification tolerance (mapconverter default is 0.001; uConsole `us-hd` uses 0.0005; smaller values produce more detail but slow down map refresh) |
 | --bbox | optional `lon_min,lat_min,lon_max,lat_max` clipping bounds for smaller offline/regional maps |
 | --output-dir | directory where generated map files are written |
 

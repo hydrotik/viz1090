@@ -8,9 +8,9 @@ GPS_TIMEOUT="8"
 GPS_DEVICE=""
 GPS_POWER=1
 GPS_POWER_GPIO="27"
-MAP_PROFILE="us"
+MAP_PROFILE="us-hd"
 BBOX="-180,17,-52,72"
-MAP_DIR="mapdata/generated/us"
+MAP_DIR="mapdata/generated/us-hd"
 WEATHER_FILE="weather/radar_tiles.csv"
 THEME="atc"
 UISCALE="1"
@@ -44,9 +44,11 @@ Options:
   --gps-power-gpio <n> GPS enable GPIO. Default: 27
   --gps-device <path> Add a GPS serial device path to try.
   --gps-timeout <sec> GPS fix timeout. Default: 8
-  --map-profile <name> us, conus, northeast, or custom. Default: us
+  --map-profile <name> us-hd, us, conus-hd, conus, drive, northeast, or custom.
+                      Default: us-hd
+  --car-mode          Larger at-a-glance UI, daylight map theme, and drive map profile.
   --bbox <bounds>     Map bbox lon_min,lat_min,lon_max,lat_max. Default: US profile.
-  --mapdir <path>     Generated map directory. Default: mapdata/generated/us
+  --mapdir <path>     Generated map directory. Default: mapdata/generated/us-hd
   --weather-file <path> Radar tile cache file. Default: weather/radar_tiles.csv
   --theme <name>      classic, atc, map, or light. Default: atc
   --uiscale <value>   UI scale. Default: 1
@@ -55,7 +57,7 @@ Options:
   --status-scale <n>  Bottom status text scale. Default: 1.8
   --simulate-weather  Draw a simulated radar storm cell.
   --debug-input       Print SDL input events to stdout.
-  --tolerance <value> Map simplification tolerance. Default: 0.001
+  --tolerance <value> Map simplification tolerance. Default: profile-specific.
   --minpop <value>    Minimum city population label. Default: 100000
   --no-roads          Do not include roads in regenerated map data.
   --no-water          Do not include lakes/rivers in regenerated map data.
@@ -67,6 +69,14 @@ EOF
 
 apply_map_profile() {
     case "${MAP_PROFILE}" in
+        us-hd)
+            BBOX="-180,17,-52,72"
+            MAP_DIR="mapdata/generated/us-hd"
+            TOLERANCE="0.0005"
+            MINPOP="50000"
+            ROADS=1
+            WATER=1
+            ;;
         us)
             BBOX="-180,17,-52,72"
             MAP_DIR="mapdata/generated/us"
@@ -75,11 +85,27 @@ apply_map_profile() {
             ROADS=1
             WATER=1
             ;;
+        conus-hd)
+            BBOX="-125,24,-66,50"
+            MAP_DIR="mapdata/generated/conus-hd"
+            TOLERANCE="0.00035"
+            MINPOP="25000"
+            ROADS=1
+            WATER=1
+            ;;
         conus)
             BBOX="-125,24,-66,50"
             MAP_DIR="mapdata/generated/conus"
             TOLERANCE="0.00075"
             MINPOP="50000"
+            ROADS=1
+            WATER=1
+            ;;
+        drive)
+            BBOX="-125,24,-66,50"
+            MAP_DIR="mapdata/generated/drive"
+            TOLERANCE="0.00035"
+            MINPOP="25000"
             ROADS=1
             WATER=1
             ;;
@@ -95,10 +121,20 @@ apply_map_profile() {
             ;;
         *)
             echo "Unknown map profile: ${MAP_PROFILE}" >&2
-            echo "Valid profiles: us, conus, northeast, custom" >&2
+            echo "Valid profiles: us-hd, us, conus-hd, conus, drive, northeast, custom" >&2
             exit 1
             ;;
     esac
+}
+
+apply_car_mode() {
+    MAP_PROFILE="drive"
+    apply_map_profile
+    THEME="map"
+    PLANE_SCALE="1.8"
+    LABEL_SCALE="2.2"
+    STATUS_SCALE="2.2"
+    GPS_TIMEOUT="20"
 }
 
 apply_map_profile
@@ -145,6 +181,10 @@ while [[ $# -gt 0 ]]; do
             MAP_PROFILE="$2"
             apply_map_profile
             shift 2
+            ;;
+        --car-mode)
+            apply_car_mode
+            shift
             ;;
         --bbox)
             MAP_PROFILE="custom"
