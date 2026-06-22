@@ -166,13 +166,13 @@ def insert_tile(conn, tile, data, input_scheme):
 
 def build_mbtiles(args):
     output = Path(args.output)
-    if output.exists() and not args.force:
-        raise SystemExit("%s already exists; pass --force to overwrite" % output)
 
     total = tile_count(args.bbox, args.min_zoom, args.max_zoom)
     if args.dry_run:
         print("would fetch %d tiles for zoom %d..%d into %s" % (total, args.min_zoom, args.max_zoom, output))
         return 0
+    if output.exists() and not args.force:
+        raise SystemExit("%s already exists; pass --force to overwrite" % output)
     if total > args.max_tiles:
         raise SystemExit(
             "refusing to fetch %d tiles; increase --max-tiles after confirming disk/time budget" % total

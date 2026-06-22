@@ -101,6 +101,28 @@ class BuildRasterMbtilesTests(unittest.TestCase):
                 ]
             )
 
+    def test_dry_run_allows_existing_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "out.mbtiles"
+            output.write_bytes(b"existing")
+
+            rc = build_raster_mbtiles.main(
+                [
+                    "--tile-url",
+                    "file://" + str(Path(tmp) / "source/{z}/{x}/{y}.png"),
+                    "--bbox=-1,-1,1,1",
+                    "--min-zoom",
+                    "0",
+                    "--max-zoom",
+                    "0",
+                    "--output",
+                    str(output),
+                    "--dry-run",
+                ]
+            )
+
+        self.assertEqual(rc, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
