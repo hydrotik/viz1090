@@ -99,6 +99,32 @@ static double lonFromTileX(int x, int z) {
     return static_cast<double>(x) / std::pow(2.0, z) * 360.0 - 180.0;
 }
 
+static int tileXFromLon(double lon, int z) {
+    int tileCount = 1 << z;
+    int x = static_cast<int>(std::floor((lon + 180.0) / 360.0 * tileCount));
+    if(x < 0) {
+        return 0;
+    }
+    if(x >= tileCount) {
+        return tileCount - 1;
+    }
+    return x;
+}
+
+static int tileYFromLat(double lat, int z) {
+    int tileCount = 1 << z;
+    lat = std::min(85.05112878, std::max(-85.05112878, lat));
+    double latRad = lat * M_PI / 180.0;
+    int y = static_cast<int>(std::floor((1.0 - std::log(std::tan(latRad) + 1.0 / std::cos(latRad)) / M_PI) / 2.0 * tileCount));
+    if(y < 0) {
+        return 0;
+    }
+    if(y >= tileCount) {
+        return tileCount - 1;
+    }
+    return y;
+}
+
 static int clampInt(int value, int minValue, int maxValue) {
     if(value < minValue) {
         return minValue;
@@ -107,6 +133,16 @@ static int clampInt(int value, int minValue, int maxValue) {
         return maxValue;
     }
     return value;
+}
+
+static SDL_Color flockColorForKind(int kind) {
+    if(kind >= 2) {
+        return {255, 150, 40, 180};
+    }
+    if(kind == 1) {
+        return {255, 70, 220, 150};
+    }
+    return {80, 220, 255, 120};
 }
 
 
@@ -1079,6 +1115,128 @@ void View::drawRasterTiles() {
 #endif
 }
 
+void View::clearFlockTileCache() {
+    flock_tile_cache.clear();
+}
+
+FlockTileCacheEntry *View::loadFlockTile(int x, int y) {
+    if(flock_data_dir.empty()) {
+        return NULL;
+    }
+
+    int tileCount = 1 << flock_zoom;
+    if(y < 0 || y >= tileCount) {
+        return NULL;
+    }
+    x = ((x % tileCount) + tileCount) % tileCount;
+
+    flock_tile_clock++;
+    for(std::vector<FlockTileCacheEntry>::iterator entry = flock_tile_cache.begin(); entry != flock_tile_cache.end(); ++entry) {
+        if(entry->x == x && entry->y == y) {
+            entry->last_used = flock_tile_clock;
+            return entry->missing ? NULL : &(*entry);
+        }
+    }
+
+    std::ostringstream pathBuilder;
+    pathBuilder << flock_data_dir << "/" << flock_zoom << "/" << x << "/" << y << ".csv";
+
+    FlockTileCacheEntry entry;
+    entry.x = x;
+    entry.y = y;
+    entry.missing = true;
+    entry.last_used = flock_tile_clock;
+
+    std::ifstream infile(pathBuilder.str().c_str());
+    if(infile) {
+        std::string line;
+        while(std::getline(infile, line)) {
+            if(line.empty() || line[0] == '#') {
+                continue;
+            }
+
+            std::replace(line.begin(), line.end(), ',', ' ');
+            std::istringstream iss(line);
+            FlockPoint point;
+            if(!(iss >> point.lat >> point.lon >> point.kind)) {
+                continue;
+            }
+            if(point.lat < -90.0f || point.lat > 90.0f || point.lon < -180.0f || point.lon > 180.0f) {
+                continue;
+            }
+            entry.points.push_back(point);
+        }
+
+        entry.missing = entry.points.empty();
+    }
+
+    flock_tile_cache.push_back(entry);
+    while(static_cast<int>(flock_tile_cache.size()) > flock_tile_cache_limit) {
+        std::vector<FlockTileCacheEntry>::iterator oldest = flock_tile_cache.begin();
+        for(std::vector<FlockTileCacheEntry>::iterator current = flock_tile_cache.begin(); current != flock_tile_cache.end(); ++current) {
+            if(current->last_used < oldest->last_used) {
+                oldest = current;
+            }
+        }
+        flock_tile_cache.erase(oldest);
+    }
+
+    FlockTileCacheEntry &stored = flock_tile_cache.back();
+    return stored.missing ? NULL : &stored;
+}
+
+void View::drawFlockOverlay() {
+    if(flock_data_dir.empty() || flock_max_points <= 0) {
+        return;
+    }
+
+    float latTop, lonLeft, latBottom, lonRight;
+    latLonFromScreenCoords(&latTop, &lonLeft, 0, 0);
+    latLonFromScreenCoords(&latBottom, &lonRight, screen_width, screen_height);
+
+    double west = std::min(static_cast<double>(lonLeft), static_cast<double>(lonRight));
+    double east = std::max(static_cast<double>(lonLeft), static_cast<double>(lonRight));
+    double north = std::max(static_cast<double>(latTop), static_cast<double>(latBottom));
+    double south = std::min(static_cast<double>(latTop), static_cast<double>(latBottom));
+
+    int tileCount = 1 << flock_zoom;
+    int xMin = tileXFromLon(west, flock_zoom);
+    int xMax = tileXFromLon(east, flock_zoom);
+    int yMin = tileYFromLat(north, flock_zoom);
+    int yMax = tileYFromLat(south, flock_zoom);
+    int drawn = 0;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    for(int x = xMin; x <= xMax && drawn < flock_max_points; x++) {
+        for(int y = yMin; y <= yMax && drawn < flock_max_points; y++) {
+            FlockTileCacheEntry *tile = loadFlockTile(x, y);
+            if(!tile) {
+                continue;
+            }
+
+            for(std::vector<FlockPoint>::iterator point = tile->points.begin(); point != tile->points.end() && drawn < flock_max_points; ++point) {
+                if(point->lon < west || point->lon > east || point->lat < south || point->lat > north) {
+                    continue;
+                }
+
+                float dx, dy;
+                int screenX, screenY;
+                pxFromLonLat(&dx, &dy, point->lon, point->lat);
+                screenCoords(&screenX, &screenY, dx, dy);
+                if(outOfBounds(screenX, screenY)) {
+                    continue;
+                }
+
+                SDL_Color color = flockColorForKind(point->kind);
+                filledCircleRGBA(renderer, screenX, screenY, 3, color.r, color.g, color.b, color.a);
+                pixelRGBA(renderer, screenX, screenY, 255, 255, 255, std::min(180, static_cast<int>(color.a) + 30));
+                drawn++;
+            }
+        }
+    }
+}
+
 void View::drawPlaceNames() {
     if(map.loaded < 100) {
         return;
@@ -1982,6 +2140,7 @@ void View::draw() {
     zoomMapToTarget();
 
     drawGeography();
+    drawFlockOverlay();
     drawWeatherOverlay();
     drawScaleBars();
 
@@ -2070,6 +2229,11 @@ View::View(AppData *appData){
     raster_tile_cache_limit = 192;
     raster_tile_clock       = 0;
     raster_tile_warning_shown = false;
+    flock_data_dir          = "";
+    flock_zoom              = 6;
+    flock_max_points        = 5000;
+    flock_tile_cache_limit  = 96;
+    flock_tile_clock        = 0;
 #ifdef HAVE_SQLITE3
     raster_tile_db          = NULL;
 #endif

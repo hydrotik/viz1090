@@ -17,6 +17,9 @@ NETWORK_CELL_PIXELS="3"
 NETWORK_MIN_COVERAGE="0.08"
 WEATHER_INTERVAL="300"
 WEATHER_MIN_PIXELS="3"
+FLOCK=1
+FLOCK_DIR="mapdata/flock"
+FLOCK_MAX_POINTS="5000"
 TILE_MAX_ZOOM="13"
 TILE_MIN_BYTES="2048"
 TILE_OPACITY="204"
@@ -58,6 +61,9 @@ Options:
   --network-cell-pixels <n>   Radar output cell size. Default: 3
   --network-min-coverage <n>  Minimum precip coverage per cell. Default: 0.08
   --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 3
+  --flock / --no-flock        Draw local FLOCK/surveillance overlay when available. Default: --flock
+  --flock-dir <path>          Local FLOCK overlay directory. Default: mapdata/flock
+  --flock-max-points <n>      Maximum FLOCK points drawn per frame. Default: 5000
   --tile-max-zoom <z>         Maximum raster basemap zoom. Default: 13
   --tile-min-bytes <n>        Skip tiny MBTiles placeholders below n bytes. Default: 2048
   --tile-opacity <0-255>      Raster basemap opacity. Default: 204
@@ -144,6 +150,22 @@ while [[ $# -gt 0 ]]; do
             ;;
         --weather-min-pixels)
             WEATHER_MIN_PIXELS="$2"
+            shift 2
+            ;;
+        --flock)
+            FLOCK=1
+            shift
+            ;;
+        --no-flock)
+            FLOCK=0
+            shift
+            ;;
+        --flock-dir)
+            FLOCK_DIR="$2"
+            shift 2
+            ;;
+        --flock-max-points)
+            FLOCK_MAX_POINTS="$2"
             shift 2
             ;;
         --tile-max-zoom)
@@ -295,6 +317,9 @@ if [[ "${DEBUG_WEATHER}" -eq 1 ]]; then
 fi
 if [[ "${FIT_WEATHER}" -eq 1 ]]; then
     app_args+=(--fit-weather)
+fi
+if [[ "${FLOCK}" -eq 1 && -d "${FLOCK_DIR}" ]]; then
+    app_args+=(--flock-dir "${FLOCK_DIR}" --flock-max-points "${FLOCK_MAX_POINTS}")
 fi
 if [[ "${REGEN_MAP}" -eq 1 ]]; then
     app_args+=(--regen-map)

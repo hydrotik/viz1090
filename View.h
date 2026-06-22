@@ -77,6 +77,20 @@ typedef struct RasterTileCacheEntry {
     int last_used;
 } RasterTileCacheEntry;
 
+typedef struct FlockPoint {
+    float lat;
+    float lon;
+    int kind;
+} FlockPoint;
+
+typedef struct FlockTileCacheEntry {
+    int x;
+    int y;
+    bool missing;
+    int last_used;
+    std::vector<FlockPoint> points;
+} FlockTileCacheEntry;
+
 class View {
 
 	private:
@@ -123,6 +137,9 @@ class View {
 		void drawTrails(int left, int top, int right, int bottom);
 		void drawScaleBars();
 		void drawRasterTiles();
+		void drawFlockOverlay();
+		FlockTileCacheEntry *loadFlockTile(int x, int y);
+		void clearFlockTileCache();
 		bool rasterTileDarkMode() const;
 		SDL_Surface *prepareRasterTileSurface(SDL_Surface *surface);
 		SDL_Texture *loadRasterTile(int z, int x, int y);
@@ -234,6 +251,12 @@ class View {
 	    int raster_tile_clock;
 	    bool raster_tile_warning_shown;
 	    std::vector<RasterTileCacheEntry> raster_tile_cache;
+	    std::string flock_data_dir;
+	    int flock_zoom;
+	    int flock_max_points;
+	    int flock_tile_cache_limit;
+	    int flock_tile_clock;
+	    std::vector<FlockTileCacheEntry> flock_tile_cache;
 #ifdef HAVE_SQLITE3
 	    sqlite3 *raster_tile_db;
 #endif

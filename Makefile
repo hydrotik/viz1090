@@ -63,6 +63,7 @@ test-weather:
 test-tiles:
 	python3 -m unittest tests.test_inspect_mbtiles
 	python3 -m unittest tests.test_build_raster_mbtiles
+	python3 -m unittest tests.test_build_flock_overlay
 
 test-fixtures:
 	python3 tools/replay_benchmark.py --check-fixture

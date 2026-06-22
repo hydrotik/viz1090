@@ -12,6 +12,9 @@ MAP_PROFILE="us-hd"
 BBOX="-180,17,-52,72"
 MAP_DIR="mapdata/generated/us-hd"
 WEATHER_FILE="weather/radar_tiles.csv"
+FLOCK_DIR=""
+FLOCK_ZOOM="6"
+FLOCK_MAX_POINTS="5000"
 ORGANIC_FEED=""
 ORGANIC_FEED_INTERVAL_MS="1000"
 THEME="atc"
@@ -67,6 +70,9 @@ Options:
   --bbox <bounds>     Map bbox lon_min,lat_min,lon_max,lat_max. Default: US profile.
   --mapdir <path>     Generated map directory. Default: mapdata/generated/us-hd
   --weather-file <path> Radar tile cache file. Default: weather/radar_tiles.csv
+  --flock-dir <path>  Local FLOCK/surveillance overlay directory.
+  --flock-zoom <z>    FLOCK overlay tile zoom. Default: 6
+  --flock-max-points <n> Maximum FLOCK points drawn per frame. Default: 5000
   --organic-feed <path> Write aircraft GeoJSON for an Organic Maps sidecar overlay.
   --organic-feed-interval-ms <ms> Feed interval. Default: 1000
   --theme <name>      classic, atc, map, or light. Default: atc
@@ -244,6 +250,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --weather-file)
             WEATHER_FILE="$2"
+            shift 2
+            ;;
+        --flock-dir)
+            FLOCK_DIR="$2"
+            shift 2
+            ;;
+        --flock-zoom)
+            FLOCK_ZOOM="$2"
+            shift 2
+            ;;
+        --flock-max-points)
+            FLOCK_MAX_POINTS="$2"
             shift 2
             ;;
         --organic-feed)
@@ -524,6 +542,10 @@ if [[ "${SIMULATE_WEATHER}" -eq 1 ]]; then
     viz_args+=(--simulate-weather)
 elif [[ -n "${WEATHER_FILE}" ]]; then
     viz_args+=(--weather-file "${WEATHER_FILE}")
+fi
+
+if [[ -n "${FLOCK_DIR}" ]]; then
+    viz_args+=(--flock-dir "${FLOCK_DIR}" --flock-zoom "${FLOCK_ZOOM}" --flock-max-points "${FLOCK_MAX_POINTS}")
 fi
 
 if [[ "${DEBUG_INPUT}" -eq 1 ]]; then

@@ -58,6 +58,9 @@ void showHelp(void) {
 "--debug-input                    Print SDL input events to stdout\n"
 "--debug-weather                  Print radar cache load/render diagnostics\n"
 "--fit-weather                    Center and zoom to the first loaded radar cache\n"
+"--flock-dir <path>               Draw local FLOCK/surveillance overlay CSV tiles\n"
+"--flock-zoom <z>                 FLOCK overlay tile zoom (default: 6)\n"
+"--flock-max-points <n>           Maximum FLOCK points drawn per frame (default: 5000)\n"
 "--lat <latitude>                 Latitude in degrees\n"
 "--label-scale <factor>           Aircraft label scaling (default: 1.0)\n"
 "--lon <longitude>                Longitude in degrees\n"
@@ -153,6 +156,23 @@ int main(int argc, char **argv) {
         } else if (!strcmp(argv[j],"--weather-file")) {
             requireArgs(argc, j, 1, argv[j]);
             view.weather_file = argv[++j];
+        } else if (!strcmp(argv[j],"--flock-dir")) {
+            requireArgs(argc, j, 1, argv[j]);
+            view.flock_data_dir = argv[++j];
+        } else if (!strcmp(argv[j],"--flock-zoom")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.flock_zoom) || view.flock_zoom < 0 || view.flock_zoom > 12) {
+                fprintf(stderr, "Invalid FLOCK zoom '%s'. Expected 0 to 12.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--flock-max-points")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.flock_max_points) || view.flock_max_points < 0 || view.flock_max_points > 100000) {
+                fprintf(stderr, "Invalid FLOCK max points '%s'. Expected 0 to 100000.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--tiles")) {
             requireArgs(argc, j, 1, argv[j]);
             view.raster_tile_source = argv[++j];
