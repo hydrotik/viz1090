@@ -163,6 +163,14 @@ mkdir -p mapdata/tiles
 
 Do not bulk-download tiles from `tile.openstreetmap.org` for offline use. Use self-hosted/generated tiles or a provider that explicitly permits offline MBTiles or tile packaging.
 
+OpenMapTiles is a good source/style path, but the `.mbtiles` container can hold either raster tiles or vector PBF/MVT tiles. Current viz1090 renders raster tiles only. Before copying a large file to the uConsole, inspect it:
+
+```
+python3 tools/inspect_mbtiles.py path/to/downloaded.mbtiles
+```
+
+The result must say `usable raster MBTiles for viz1090`. If it says vector, render/export it to raster MBTiles first with MapTiler Engine, TileServer GL, or another OpenMapTiles-compatible renderer.
+
 For the Organic Maps path, use Organic Maps as the primary offline map/navigation engine and run viz1090 as the ADS-B feed producer:
 
 ```

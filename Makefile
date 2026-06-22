@@ -59,6 +59,9 @@ test-weather:
 	python3 -m unittest tests.test_network_weather
 	python3 -m unittest tests.test_uat_weather_cycle
 
+test-tiles:
+	python3 -m unittest tests.test_inspect_mbtiles
+
 test-fixtures:
 	python3 tools/replay_benchmark.py --check-fixture
 
@@ -68,7 +71,7 @@ smoke-ui: viz1090
 benchmark-smoke: viz1090
 	python3 tools/replay_benchmark.py --duration 15 --rate 60 --port 33006 --dummy-video
 
-test: test-core test-mapconverter test-gps test-weather test-fixtures
+test: test-core test-mapconverter test-gps test-weather test-tiles test-fixtures
 
 sanitize:
 	$(MAKE) clean

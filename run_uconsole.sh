@@ -24,6 +24,7 @@ TILE_MODE="auto"
 TILE_MIN_ZOOM="0"
 TILE_MAX_ZOOM="17"
 TILE_ZOOM_OFFSET="0"
+TILE_USABLE=1
 TOLERANCE="0.001"
 MINPOP="100000"
 ROADS=1
@@ -417,6 +418,19 @@ if [[ -n "${TILE_SOURCE}" && ! -e "${TILE_SOURCE}" ]]; then
     echo "Raster tile source ${TILE_SOURCE} was requested but does not exist yet; continuing with vector map only." >&2
 fi
 
+if [[ -n "${TILE_SOURCE}" && -f "${TILE_SOURCE}" ]]; then
+    case "${TILE_SOURCE}" in
+        *.mbtiles|*.MBTILES)
+            if ! python3 tools/inspect_mbtiles.py --quiet "${TILE_SOURCE}"; then
+                TILE_USABLE=0
+                echo "Raster tile source ${TILE_SOURCE} is not directly renderable by viz1090:" >&2
+                python3 tools/inspect_mbtiles.py "${TILE_SOURCE}" >&2 || true
+                echo "Continuing with generated vector map only. Use raster PNG/JPEG/WebP MBTiles, not vector PBF/MVT MBTiles." >&2
+            fi
+            ;;
+    esac
+fi
+
 viz_args=(
     --fullscreen
     --screensize 1280 720
@@ -430,7 +444,7 @@ viz_args=(
     --lon "${LON}"
 )
 
-if [[ -n "${TILE_SOURCE}" && -e "${TILE_SOURCE}" ]]; then
+if [[ -n "${TILE_SOURCE}" && -e "${TILE_SOURCE}" && "${TILE_USABLE}" -eq 1 ]]; then
     viz_args+=(
         --tiles "${TILE_SOURCE}"
         --tiles-mode "${TILE_MODE}"

@@ -150,9 +150,10 @@ Raster/OSM-style basemap path:
 - Tile rendering is optional at build time. Install `libsdl2-image-dev` for PNG/JPEG tile decoding and `libsqlite3-dev` for MBTiles, then run `make clean && make viz1090`.
 - MBTiles are queried using the standard TMS tile row convention; xyz/tms directories are read from `<source>/<z>/<x>/<y>.png|jpg|jpeg|webp`.
 - The raster basemap is drawn underneath the existing vector layers, cached radar/weather overlay, aircraft trails, aircraft icons, labels, and status strip.
+- OpenMapTiles is the preferred high-fidelity data/style path, but current viz1090 only renders raster MBTiles. OpenMapTiles vector MBTiles (`metadata.format=pbf` or `mvt`) must be rendered/exported to raster PNG/JPEG/WebP MBTiles first. `tools/inspect_mbtiles.py <file.mbtiles>` identifies whether a downloaded MBTiles file is directly usable.
 - `./run_uconsole.sh --osm-mode --tiles mapdata/tiles/us.mbtiles` is the intended launch shape once a legal offline MBTiles basemap exists.
 - Do not bulk scrape `tile.openstreetmap.org` into MBTiles. OSM's tile policy prohibits bulk downloading and offline use of those hosted raster tiles. Use self-hosted/generated tiles or a provider that explicitly allows offline packaging.
-- Organic Maps is a useful product/design reference for offline OSM maps, but this repo should not embed Organic Maps directly. Its app engine is much larger than needed for viz1090, and its binary `.mwm` map files carry a separate license/attribution path. Keep the integration boundary at standard tile packages unless the project intentionally pivots to a full navigation stack.
+- Organic Maps is a useful product/design reference for offline OSM maps, but it is no longer the primary uConsole map path. Current Organic Maps source did not build cleanly on Debian 12/aarch64 with the uConsole's available GCC 12/Clang 14 C++23 library support. Its `.mwm` files are not MBTiles and are not directly usable by the SDL renderer.
 
 Organic Maps integration path:
 

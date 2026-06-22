@@ -1,6 +1,19 @@
 # Organic Maps Integration
 
-This project is moving toward Organic Maps as the high-fidelity offline map engine for car-friendly and navigation-style views.
+This path is experimental. The practical uConsole map path is now the native SDL viz1090 app with offline raster MBTiles, preferably rendered from OpenMapTiles/OpenStreetMap data. Organic Maps remains useful as a design reference and Mac-side prototype, but it is not the primary uConsole implementation target right now.
+
+Current Organic Maps source did not build cleanly on the uConsole's Debian 12/aarch64 toolchain. GCC 12 failed in C++23 constexpr code, and Clang 14 lacked the required standard library support for pieces such as `std::expected` and `<format>`. Revisit this only if the uConsole has a newer toolchain or if the project intentionally pivots to a full navigation app.
+
+Organic Maps offline `.mwm` files are not raster MBTiles and cannot be passed to `viz1090 --tiles`.
+
+For the uConsole, prefer:
+
+```
+python3 tools/inspect_mbtiles.py mapdata/tiles/us.mbtiles
+./run_uconsole.sh --osm-mode --tiles mapdata/tiles/us.mbtiles
+```
+
+The inspector must report `usable raster MBTiles for viz1090`. OpenMapTiles vector MBTiles need to be rendered/exported to raster MBTiles first.
 
 Organic Maps should be treated as a sibling application/engine, not as vendored source inside viz1090. The optimized split is:
 
