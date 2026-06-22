@@ -7,7 +7,7 @@ TILES="mapdata/tiles/nyc-raster.mbtiles"
 USE_TILES=1
 MAP_PROFILE="us-hd"
 WEATHER_BBOX="-75,39.8,-71.8,42.2"
-NETWORK_ZOOM="8"
+NETWORK_ZOOM="6"
 NETWORK_CELL_PIXELS="3"
 NETWORK_MIN_COVERAGE="0.08"
 WEATHER_MIN_PIXELS="3"
@@ -43,7 +43,7 @@ Options:
   --lon <value>               Fallback longitude. Default: -73.845139
   --gps / --no-gps            Let run_uconsole.sh try GPS. Default: --gps
   --weather-bbox <bbox>       lon_min,lat_min,lon_max,lat_max. Default: NYC metro
-  --network-zoom <z>          RainViewer fetch zoom. Default: 8
+  --network-zoom <z>          RainViewer fetch zoom. Default: 6
   --network-cell-pixels <n>   Radar output cell size. Default: 3
   --network-min-coverage <n>  Minimum precip coverage per cell. Default: 0.08
   --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 3

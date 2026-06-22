@@ -319,6 +319,27 @@ def classify_intensity(r, g, b, a):
     return 1
 
 
+def is_placeholder_tile(width, height, pixels):
+    total = max(1, width * height)
+    visible = 0
+    label_like = 0
+
+    for row in pixels:
+        for r, g, b, a in row:
+            if a <= 12:
+                continue
+            visible += 1
+            if a > 100 and ((r > 220 and g > 220 and b > 220) or (r < 25 and g < 25 and b < 25)):
+                label_like += 1
+
+    if visible == 0:
+        return False
+
+    visible_ratio = visible / float(total)
+    label_ratio = label_like / float(visible)
+    return visible_ratio > 0.03 and label_ratio > 0.35
+
+
 def tiles_from_image(width, height, pixels, center_lat, center_lon, zoom, size, cell_pixels, min_coverage):
     center_x = lon_to_world_x(center_lon, zoom, size)
     center_y = lat_to_world_y(center_lat, zoom, size)
@@ -399,6 +420,9 @@ def fetch_rainviewer(args):
                 )
                 image_data = fetch_url(tile_url, args.timeout)
                 width, height, pixels = decode_png_rgba(image_data)
+                if is_placeholder_tile(width, height, pixels):
+                    print("skipping placeholder radar tile %s" % tile_url, file=sys.stderr)
+                    continue
                 tiles.extend(
                     tiles_from_image_at_origin(
                         width,
@@ -423,6 +447,8 @@ def fetch_rainviewer(args):
     )
     image_data = fetch_url(tile_url, args.timeout)
     width, height, pixels = decode_png_rgba(image_data)
+    if is_placeholder_tile(width, height, pixels):
+        return write_tiles(Path(args.output), [], metadata, frame, tile_url, args.preserve_empty)
     tiles = tiles_from_image(
         width,
         height,

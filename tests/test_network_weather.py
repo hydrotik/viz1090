@@ -127,6 +127,25 @@ class NetworkWeatherTests(unittest.TestCase):
         self.assertEqual(len(tiles), 2)
         self.assertTrue(all(tile[4] == 1 for tile in tiles))
 
+    def test_placeholder_tile_detection_ignores_error_labels(self):
+        pixels = [[(0, 0, 0, 0) for _ in range(10)] for _ in range(10)]
+        for y in range(2, 7):
+            for x in range(1, 9):
+                pixels[y][x] = (0, 0, 0, 255)
+        for y in range(3, 6):
+            for x in range(3, 7):
+                pixels[y][x] = (255, 255, 255, 255)
+
+        self.assertTrue(network_weather.is_placeholder_tile(10, 10, pixels))
+
+    def test_placeholder_tile_detection_keeps_radar(self):
+        pixels = [[(0, 0, 0, 0) for _ in range(10)] for _ in range(10)]
+        for y in range(2, 7):
+            for x in range(1, 9):
+                pixels[y][x] = (0, 180, 60, 160)
+
+        self.assertFalse(network_weather.is_placeholder_tile(10, 10, pixels))
+
     def test_tiles_from_image_at_origin_uses_tile_origin(self):
         pixels = [[(0, 180, 60, 180)]]
         x, y = network_weather.tile_xy_for_lon_lat(-81.6944, 41.4993, 5)
