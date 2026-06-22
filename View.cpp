@@ -1490,22 +1490,43 @@ void View::drawWeatherTiles() {
         SDL_Color color = weatherColorForIntensity(tile->intensity);
 
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_Rect shadowRect = {
-            clippedRect.x - 1,
-            clippedRect.y - 1,
-            clippedRect.w + 2,
-            clippedRect.h + 2
-        };
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 120);
-        SDL_RenderFillRect(renderer, &shadowRect);
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &clippedRect);
+        boxRGBA(
+            renderer,
+            clippedRect.x - 2,
+            clippedRect.y - 2,
+            clippedRect.x + clippedRect.w + 1,
+            clippedRect.y + clippedRect.h + 1,
+            0,
+            0,
+            0,
+            180
+        );
+        boxRGBA(
+            renderer,
+            clippedRect.x,
+            clippedRect.y,
+            clippedRect.x + clippedRect.w - 1,
+            clippedRect.y + clippedRect.h - 1,
+            color.r,
+            color.g,
+            color.b,
+            255
+        );
         visibleTiles++;
         visibleIntensityCounts[tile->intensity]++;
         visibleLeft = std::min(visibleLeft, clippedRect.x);
         visibleTop = std::min(visibleTop, clippedRect.y);
         visibleRight = std::max(visibleRight, clippedRect.x + clippedRect.w);
         visibleBottom = std::max(visibleBottom, clippedRect.y + clippedRect.h);
+    }
+
+    if(visibleTiles > 0) {
+        rectangleRGBA(renderer, visibleLeft, visibleTop, visibleRight, visibleBottom, 255, 255, 255, 220);
+        rectangleRGBA(renderer, visibleLeft - 1, visibleTop - 1, visibleRight + 1, visibleBottom + 1, 0, 0, 0, 220);
+        thickLineRGBA(renderer, visibleLeft, visibleTop, visibleRight, visibleTop, 2, 255, 255, 255, 220);
+        thickLineRGBA(renderer, visibleLeft, visibleBottom, visibleRight, visibleBottom, 2, 255, 255, 255, 220);
+        thickLineRGBA(renderer, visibleLeft, visibleTop, visibleLeft, visibleBottom, 2, 255, 255, 255, 220);
+        thickLineRGBA(renderer, visibleRight, visibleTop, visibleRight, visibleBottom, 2, 255, 255, 255, 220);
     }
 
     if(visibleTiles == 0 && offscreenTiles > 0) {
