@@ -1357,6 +1357,7 @@ void View::drawWeatherTiles() {
     int offscreenIntensity = 0;
     float offscreenX = 0.0f;
     float offscreenY = 0.0f;
+    float nearestOffscreenDistance = -1.0f;
     int drawableBottom = screen_height - statusFontHeight - 3 * PAD;
     if(drawableBottom < screen_height / 2) {
         drawableBottom = screen_height;
@@ -1374,10 +1375,6 @@ void View::drawWeatherTiles() {
         screenCoords(&x3, &y3, dx, dy);
         pxFromLonLat(&dx, &dy, tile->lon_min, tile->lat_max);
         screenCoords(&x4, &y4, dx, dy);
-
-        if(outOfBounds(x1, y1) && outOfBounds(x2, y2) && outOfBounds(x3, y3) && outOfBounds(x4, y4)) {
-            continue;
-        }
 
         int left = std::min(std::min(x1, x2), std::min(x3, x4));
         int right = std::max(std::max(x1, x2), std::max(x3, x4));
@@ -1411,9 +1408,30 @@ void View::drawWeatherTiles() {
 
         if(clippedRect.w <= 0 || clippedRect.h <= 0) {
             offscreenTiles++;
-            offscreenIntensity = std::max(offscreenIntensity, tile->intensity);
-            offscreenX += (left + right) * 0.5f;
-            offscreenY += (top + bottom) * 0.5f;
+            float tileCenterX = (left + right) * 0.5f;
+            float tileCenterY = (top + bottom) * 0.5f;
+            float dxToDrawable = 0.0f;
+            float dyToDrawable = 0.0f;
+
+            if(tileCenterX < 0.0f) {
+                dxToDrawable = -tileCenterX;
+            } else if(tileCenterX > screen_width) {
+                dxToDrawable = tileCenterX - screen_width;
+            }
+
+            if(tileCenterY < 0.0f) {
+                dyToDrawable = -tileCenterY;
+            } else if(tileCenterY > drawableBottom) {
+                dyToDrawable = tileCenterY - drawableBottom;
+            }
+
+            float distance = dxToDrawable * dxToDrawable + dyToDrawable * dyToDrawable;
+            if(nearestOffscreenDistance < 0.0f || distance < nearestOffscreenDistance || (distance == nearestOffscreenDistance && tile->intensity > offscreenIntensity)) {
+                nearestOffscreenDistance = distance;
+                offscreenIntensity = tile->intensity;
+                offscreenX = tileCenterX;
+                offscreenY = tileCenterY;
+            }
             continue;
         }
 
@@ -1439,8 +1457,6 @@ void View::drawWeatherTiles() {
     }
 
     if(visibleTiles == 0 && offscreenTiles > 0) {
-        offscreenX /= static_cast<float>(offscreenTiles);
-        offscreenY /= static_cast<float>(offscreenTiles);
         int markerX = std::max(24, std::min(screen_width - 24, static_cast<int>(offscreenX)));
         int markerY = std::max(24, std::min(drawableBottom - 24, static_cast<int>(offscreenY)));
         SDL_Color markerColor = weatherColorForIntensity(offscreenIntensity);
