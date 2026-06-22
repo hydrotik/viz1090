@@ -1214,11 +1214,11 @@ static SDL_Color weatherColorForIntensity(int intensity) {
     }
 
     if(intensity == 3) {
-        return {255, 50, 35, 93};
+        return {255, 50, 35, 70};
     }
 
     if(intensity == 2) {
-        return {255, 220, 0, 76};
+        return {255, 220, 0, 65};
     }
 
     return {35, 255, 85, 45};
