@@ -57,6 +57,7 @@ void showHelp(void) {
 "--help                           Show this help\n"
 "--debug-input                    Print SDL input events to stdout\n"
 "--debug-weather                  Print radar cache load/render diagnostics\n"
+"--fit-weather                    Center and zoom to the first loaded radar cache\n"
 "--lat <latitude>                 Latitude in degrees\n"
 "--label-scale <factor>           Aircraft label scaling (default: 1.0)\n"
 "--lon <longitude>                Longitude in degrees\n"
@@ -254,6 +255,8 @@ int main(int argc, char **argv) {
             debugInput = true;
         } else if (!strcmp(argv[j],"--debug-weather")) {
             view.debug_weather = true;
+        } else if (!strcmp(argv[j],"--fit-weather")) {
+            view.fit_weather = true;
         } else if (!strcmp(argv[j],"--weather-min-pixels")) {
             requireArgs(argc, j, 1, argv[j]);
             if(!parseIntArg(argv[++j], &view.weather_min_pixels) || view.weather_min_pixels < 1 || view.weather_min_pixels > 12) {

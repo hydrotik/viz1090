@@ -36,6 +36,7 @@ REGEN_MAP=0
 SKIP_MAP=0
 DEBUG_INPUT=0
 DEBUG_WEATHER=0
+FIT_WEATHER=0
 EXTRA_ARGS=()
 
 usage() {
@@ -80,6 +81,7 @@ Options:
   --simulate-weather  Draw a simulated radar storm cell.
   --debug-input       Print SDL input events to stdout.
   --debug-weather     Print radar cache load/render diagnostics.
+  --fit-weather       Center and zoom to the first loaded radar cache.
   --tolerance <value> Map simplification tolerance. Default: profile-specific.
   --minpop <value>    Minimum city population label. Default: 100000
   --no-roads          Do not include roads in regenerated map data.
@@ -306,6 +308,10 @@ while [[ $# -gt 0 ]]; do
             DEBUG_WEATHER=1
             shift
             ;;
+        --fit-weather)
+            FIT_WEATHER=1
+            shift
+            ;;
         --tolerance)
             MAP_PROFILE="custom"
             TOLERANCE="$2"
@@ -493,6 +499,9 @@ if [[ "${DEBUG_INPUT}" -eq 1 ]]; then
 fi
 if [[ "${DEBUG_WEATHER}" -eq 1 ]]; then
     viz_args+=(--debug-weather)
+fi
+if [[ "${FIT_WEATHER}" -eq 1 ]]; then
+    viz_args+=(--fit-weather)
 fi
 
 exec ./viz1090 "${viz_args[@]}" "${EXTRA_ARGS[@]}"

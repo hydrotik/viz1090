@@ -14,6 +14,7 @@ WEATHER=1
 RF_WEATHER=0
 GPS=1
 DEBUG_WEATHER=0
+FIT_WEATHER=0
 REGEN_MAP=0
 APP_EXTRA=()
 
@@ -42,6 +43,7 @@ Options:
   --rf-weather                Try RF UAT/FIS-B before network fallback.
   --no-weather                Start app without the weather updater.
   --debug-weather             Print radar load/render diagnostics.
+  --fit-weather               Center and zoom to the first loaded radar cache.
   --regen-map                 Regenerate generated map data.
   --help                      Show this help.
 EOF
@@ -103,6 +105,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --debug-weather)
             DEBUG_WEATHER=1
+            shift
+            ;;
+        --fit-weather)
+            FIT_WEATHER=1
             shift
             ;;
         --regen-map)
@@ -174,6 +180,9 @@ if [[ "${GPS}" -eq 0 ]]; then
 fi
 if [[ "${DEBUG_WEATHER}" -eq 1 ]]; then
     app_args+=(--debug-weather)
+fi
+if [[ "${FIT_WEATHER}" -eq 1 ]]; then
+    app_args+=(--fit-weather)
 fi
 if [[ "${REGEN_MAP}" -eq 1 ]]; then
     app_args+=(--regen-map)

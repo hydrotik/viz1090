@@ -137,6 +137,7 @@ class View {
 		void drawWeatherOverlay();
 		void drawWeatherTiles();
 		void loadWeatherTiles();
+		void fitWeatherToView(float latMin, float latMax, float lonMin, float lonMax);
 		void updateSimulatedWeatherTiles();
 		void drawSignalMarks(Aircraft *p, int x, int y);
 		void drawPlaneText(Aircraft *p);
@@ -207,6 +208,9 @@ class View {
 	    float status_scale;
 	    bool simulate_weather;
 	    bool debug_weather;
+	    bool fit_weather;
+	    bool weather_fit_done;
+	    bool weather_fit_redraw_pending;
 	    int weather_min_pixels;
 	    std::string weather_file;
 	    std::vector<WeatherTile> weather_tiles;

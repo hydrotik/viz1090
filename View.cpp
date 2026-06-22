@@ -1297,6 +1297,58 @@ void View::loadWeatherTiles() {
     }
 
     weather_tiles.swap(loaded_tiles);
+
+    if(fit_weather && !weather_fit_done && !weather_tiles.empty()) {
+        fitWeatherToView(latMin, latMax, lonMin, lonMax);
+    }
+}
+
+void View::fitWeatherToView(float latMin, float latMax, float lonMin, float lonMax) {
+    float fitLat = (latMin + latMax) * 0.5f;
+    float fitLon = (lonMin + lonMax) * 0.5f;
+    float halfLat = std::max(0.01f, (latMax - latMin) * 0.5f);
+    float halfLon = std::max(0.01f, (lonMax - lonMin) * 0.5f);
+    float scaleFactor = (screen_width > screen_height) ? screen_width : screen_height;
+    float drawableHeight = static_cast<float>(screen_height - statusFontHeight - 3 * PAD);
+
+    if(drawableHeight < screen_height * 0.5f) {
+        drawableHeight = static_cast<float>(screen_height);
+    }
+
+    float halfWidthKm = LATLONMULT * halfLon * cos(fitLat * M_PI / 180.0f);
+    float halfHeightKm = LATLONMULT * halfLat;
+    float widthFit = halfWidthKm * scaleFactor / std::max(1.0f, static_cast<float>(screen_width));
+    float heightFit = halfHeightKm * scaleFactor / std::max(1.0f, drawableHeight);
+    float fitDist = std::max(widthFit, heightFit) * 1.35f;
+
+    maxDist = std::max(5.0f, fitDist);
+    centerLat = fitLat;
+    centerLon = fitLon;
+    currentLat = centerLat;
+    currentLon = centerLon;
+    currentMaxDist = maxDist;
+    mapTargetLat = 0.0f;
+    mapTargetLon = 0.0f;
+    mapTargetMaxDist = 0.0f;
+    mapMoved = 0;
+    mapRedraw = 1;
+    weather_fit_done = true;
+    weather_fit_redraw_pending = true;
+    highFramerate = true;
+
+    if(debug_weather) {
+        printf(
+            "weather: fit view center %.4f,%.4f zoom %.2f from bounds %.4f,%.4f to %.4f,%.4f\n",
+            centerLon,
+            centerLat,
+            maxDist,
+            lonMin,
+            latMin,
+            lonMax,
+            latMax
+        );
+        fflush(stdout);
+    }
 }
 
 void View::updateSimulatedWeatherTiles() {
@@ -1499,6 +1551,11 @@ void View::drawWeatherOverlay() {
     }
 
     if(weather_tiles.empty()) {
+        return;
+    }
+
+    if(weather_fit_redraw_pending) {
+        weather_fit_redraw_pending = false;
         return;
     }
 
@@ -1939,6 +1996,9 @@ View::View(AppData *appData){
     status_scale            = 1.0f;
     simulate_weather        = false;
     debug_weather           = false;
+    fit_weather             = false;
+    weather_fit_done        = false;
+    weather_fit_redraw_pending = false;
     weather_min_pixels      = 6;
     weather_file            = "";
     raster_tile_source      = "";
