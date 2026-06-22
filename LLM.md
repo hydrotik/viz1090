@@ -197,7 +197,7 @@ HackerGadgets documents AIO V2 GPS power on GPIO 27. `run_uconsole.sh` tries `pi
 `tools/gps_fix.py` uses only the Python standard library. It attempts:
 
 1. `gpsd` JSON on `127.0.0.1:2947`, if `gpsd` is running.
-2. Raw NMEA from known serial devices, including the observed ClockworkPi `/dev/ttyACM0` path.
+2. Raw NMEA from known serial devices, including `/dev/serial0`, `/dev/ttyS0`, `/dev/ttyAMA0`, and the observed ClockworkPi `/dev/ttyACM0` path.
 
 If no fix is available within `--gps-timeout`, `run_uconsole.sh` continues with configured coordinates.
 
@@ -207,6 +207,7 @@ Future GPS/tracking revisit:
 - Consider continuously tracking GPS while the app runs, not just startup location.
 - Add an explicit on-screen indication for `gps` versus configured/fallback location.
 - Consider map auto-recenter on moving GPS location for car use, with a key to pause/resume follow mode.
+- `run_gps_probe.sh --timeout 120` is the preferred diagnostic path. It enables GPIO 27 when possible, checks gpsd, reports UART boot settings, lists candidate serial devices, prints sample NMEA lines, and reports whether a valid fix was found. If NMEA sentences appear but no fix is found, the GPS is powered and communicating but still needs sky view/time for a fix. If no NMEA lines appear, check `/boot/firmware/config.txt` for `enable_uart=1` and ensure `/boot/firmware/cmdline.txt` does not assign the GPS UART to `console=serial0,115200`.
 
 ## OTA Weather Possibilities
 
@@ -218,6 +219,7 @@ Implementation options:
 - Possible with one RTL-SDR: periodically stop or pause the 1090 MHz decoder, retune to 978 MHz, run a UAT/FIS-B decoder such as `dump978` for a short window, cache decoded weather products, then return to 1090 MHz. A 4 minute cycle is plausible for slowly changing weather, but aircraft updates will be missed during UAT receive windows.
 - NOAA Weather Radio around 162 MHz provides audio/text-style weather alerts, not radar images.
 - NOAA APT/HRPT/GOES satellite paths are different RF systems and not a good fit for quick local radar in this handheld workflow.
+- Internet fallback is practical when the uConsole has connectivity. `tools/network_weather.py` uses RainViewer's public Weather Maps API to fetch the latest radar tile around the current location and convert it into the same `weather/radar_tiles.csv` format used by the renderer. RainViewer describes the API as free for personal, educational, and small community use, best-effort, refreshed around every 5 minutes, with visible attribution required.
 
 Near-term radar-only weather plan:
 
@@ -234,6 +236,7 @@ uConsole UAT diagnostics:
 - `SoapySDRUtil --probe` will fail with `usb_claim_interface error -6` if `dump1090-mutability` already owns the single RTL-SDR. That is expected after the capture script restarts ADS-B service.
 - The UAT capture script now prints JSON capture progress every 15 seconds. Let the capture complete unless it is clearly wedged.
 - Zooming/panning the map should not retune the SDR. The app should render cached weather data; SDR retuning should happen on a timed/manual weather capture cycle.
+- `run_weather_hybrid_cycle.sh` is the preferred long-running weather updater. It tries RF UAT/FIS-B first; if the capture produces zero new JSON messages, it fetches network radar if internet is available and backs off the RF retry interval up to a maximum. Use `--once` for a single RF/network update before launching the UI.
 
 Weather UI validation:
 

@@ -1,0 +1,324 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import math
+import struct
+import sys
+import urllib.error
+import urllib.request
+import zlib
+from pathlib import Path
+
+
+RAINVIEWER_API = "https://api.rainviewer.com/public/weather-maps.json"
+USER_AGENT = "viz1090 weather fallback/0.1"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def fetch_url(url, timeout):
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read()
+
+
+def latest_radar_frame(metadata):
+    radar = metadata.get("radar") or {}
+    frames = []
+    frames.extend(radar.get("past") or [])
+    frames.extend(radar.get("nowcast") or [])
+    if not frames:
+        raise ValueError("RainViewer metadata did not include radar frames")
+    return max(frames, key=lambda frame: int(frame.get("time", 0)))
+
+
+def rainviewer_tile_url(metadata, frame, lat, lon, zoom, size, color, smooth, snow):
+    host = metadata.get("host")
+    path = frame.get("path")
+    if not host or not path:
+        raise ValueError("RainViewer metadata missing host/path")
+    return "%s%s/%d/%d/%.5f/%.5f/%d/%d_%d.png" % (
+        host.rstrip("/"),
+        path,
+        size,
+        zoom,
+        lat,
+        lon,
+        color,
+        smooth,
+        snow,
+    )
+
+
+def paeth(a, b, c):
+    p = a + b - c
+    pa = abs(p - a)
+    pb = abs(p - b)
+    pc = abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def png_chunks(data):
+    if not data.startswith(PNG_SIGNATURE):
+        raise ValueError("not a PNG image")
+
+    offset = len(PNG_SIGNATURE)
+    while offset + 8 <= len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        kind = data[offset + 4 : offset + 8]
+        payload_start = offset + 8
+        payload_end = payload_start + length
+        if payload_end + 4 > len(data):
+            raise ValueError("truncated PNG chunk")
+        yield kind, data[payload_start:payload_end]
+        offset = payload_end + 4
+        if kind == b"IEND":
+            break
+
+
+def decode_png_rgba(data):
+    width = height = bit_depth = color_type = None
+    compressed = []
+    palette = []
+    palette_alpha = []
+
+    for kind, payload in png_chunks(data):
+        if kind == b"IHDR":
+            width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(
+                ">IIBBBBB", payload
+            )
+            if bit_depth != 8 or compression != 0 or filter_method != 0 or interlace != 0:
+                raise ValueError("unsupported PNG format")
+        elif kind == b"PLTE":
+            palette = [tuple(payload[i : i + 3]) for i in range(0, len(payload), 3)]
+        elif kind == b"tRNS":
+            palette_alpha = list(payload)
+        elif kind == b"IDAT":
+            compressed.append(payload)
+
+    if width is None or height is None:
+        raise ValueError("PNG missing IHDR")
+
+    if color_type == 6:
+        raw_bpp = 4
+    elif color_type == 2:
+        raw_bpp = 3
+    elif color_type == 3:
+        raw_bpp = 1
+    else:
+        raise ValueError("unsupported PNG color type %s" % color_type)
+
+    raw = zlib.decompress(b"".join(compressed))
+    stride = width * raw_bpp
+    rows = []
+    pos = 0
+    previous = bytearray(stride)
+
+    for _ in range(height):
+        filter_type = raw[pos]
+        pos += 1
+        scanline = bytearray(raw[pos : pos + stride])
+        pos += stride
+
+        for i in range(stride):
+            left = scanline[i - raw_bpp] if i >= raw_bpp else 0
+            up = previous[i]
+            up_left = previous[i - raw_bpp] if i >= raw_bpp else 0
+
+            if filter_type == 1:
+                scanline[i] = (scanline[i] + left) & 0xFF
+            elif filter_type == 2:
+                scanline[i] = (scanline[i] + up) & 0xFF
+            elif filter_type == 3:
+                scanline[i] = (scanline[i] + ((left + up) // 2)) & 0xFF
+            elif filter_type == 4:
+                scanline[i] = (scanline[i] + paeth(left, up, up_left)) & 0xFF
+            elif filter_type != 0:
+                raise ValueError("unsupported PNG filter %s" % filter_type)
+
+        rows.append(bytes(scanline))
+        previous = scanline
+
+    pixels = []
+    if color_type == 6:
+        for row in rows:
+            pixels.append([tuple(row[i : i + 4]) for i in range(0, len(row), 4)])
+    elif color_type == 2:
+        for row in rows:
+            pixels.append([(row[i], row[i + 1], row[i + 2], 255) for i in range(0, len(row), 3)])
+    else:
+        for row in rows:
+            decoded = []
+            for value in row:
+                if value >= len(palette):
+                    decoded.append((0, 0, 0, 0))
+                    continue
+                rgb = palette[value]
+                alpha = palette_alpha[value] if value < len(palette_alpha) else 255
+                decoded.append((rgb[0], rgb[1], rgb[2], alpha))
+            pixels.append(decoded)
+
+    return width, height, pixels
+
+
+def lon_to_world_x(lon, zoom, size):
+    return (lon + 180.0) / 360.0 * size * (2**zoom)
+
+
+def lat_to_world_y(lat, zoom, size):
+    sin_lat = math.sin(math.radians(max(-85.05112878, min(85.05112878, lat))))
+    return (0.5 - math.log((1 + sin_lat) / (1 - sin_lat)) / (4 * math.pi)) * size * (2**zoom)
+
+
+def world_x_to_lon(x, zoom, size):
+    return x / (size * (2**zoom)) * 360.0 - 180.0
+
+
+def world_y_to_lat(y, zoom, size):
+    n = math.pi - 2.0 * math.pi * y / (size * (2**zoom))
+    return math.degrees(math.atan(math.sinh(n)))
+
+
+def pixel_to_lon_lat(px, py, center_lat, center_lon, zoom, size):
+    center_x = lon_to_world_x(center_lon, zoom, size)
+    center_y = lat_to_world_y(center_lat, zoom, size)
+    world_x = center_x - size / 2.0 + px
+    world_y = center_y - size / 2.0 + py
+    return world_x_to_lon(world_x, zoom, size), world_y_to_lat(world_y, zoom, size)
+
+
+def classify_intensity(r, g, b, a):
+    if a < 16:
+        return 0
+
+    if r > 145 and b > 120 and g < 150:
+        return 4
+    if r > 155 and g < 155:
+        return 3
+    if r > 145 and g > 120:
+        return 2
+    if g > 90:
+        return 1
+
+    brightness = max(r, g, b)
+    if brightness > 225:
+        return 4
+    if brightness > 175:
+        return 3
+    if brightness > 115:
+        return 2
+    return 1
+
+
+def tiles_from_image(width, height, pixels, center_lat, center_lon, zoom, size, cell_pixels, min_coverage):
+    tiles = []
+
+    for y in range(0, height, cell_pixels):
+        for x in range(0, width, cell_pixels):
+            count = 0
+            total = [0, 0, 0, 0]
+            samples = 0
+
+            for py in range(y, min(y + cell_pixels, height)):
+                for px in range(x, min(x + cell_pixels, width)):
+                    samples += 1
+                    r, g, b, a = pixels[py][px]
+                    if a > 12:
+                        count += 1
+                        total[0] += r
+                        total[1] += g
+                        total[2] += b
+                        total[3] += a
+
+            if samples == 0 or count / float(samples) < min_coverage:
+                continue
+
+            avg = [value / float(count) for value in total]
+            intensity = classify_intensity(avg[0], avg[1], avg[2], avg[3])
+            if intensity < 1:
+                continue
+
+            lon1, lat1 = pixel_to_lon_lat(x, y, center_lat, center_lon, zoom, size)
+            lon2, lat2 = pixel_to_lon_lat(
+                min(x + cell_pixels, width), min(y + cell_pixels, height), center_lat, center_lon, zoom, size
+            )
+            tiles.append((min(lat1, lat2), min(lon1, lon2), max(lat1, lat2), max(lon1, lon2), intensity))
+
+    return tiles
+
+
+def write_tiles(path, tiles, metadata, frame, source_url, preserve_empty=False):
+    if not tiles and preserve_empty and path.exists():
+        print("network weather returned no precipitation; preserving existing %s" % path)
+        return 0
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(path.suffix + ".tmp")
+    with temp_path.open("w", encoding="utf-8") as handle:
+        handle.write("# source=rainviewer generated=%s frame_time=%s\n" % (metadata.get("generated", ""), frame.get("time", "")))
+        handle.write("# Weather data by RainViewer https://www.rainviewer.com/\n")
+        handle.write("# tile_url=%s\n" % source_url)
+        handle.write("# lat_min,lon_min,lat_max,lon_max,intensity\n")
+        for tile in tiles:
+            handle.write("%.6f,%.6f,%.6f,%.6f,%d\n" % tile)
+
+    temp_path.replace(path)
+    print("wrote %d network radar tile(s) to %s" % (len(tiles), path))
+    return len(tiles)
+
+
+def fetch_rainviewer(args):
+    metadata = json.loads(fetch_url(args.api_url, args.timeout).decode("utf-8"))
+    frame = latest_radar_frame(metadata)
+    tile_url = rainviewer_tile_url(
+        metadata, frame, args.lat, args.lon, args.zoom, args.size, args.color, args.smooth, args.snow
+    )
+    image_data = fetch_url(tile_url, args.timeout)
+    width, height, pixels = decode_png_rgba(image_data)
+    tiles = tiles_from_image(
+        width,
+        height,
+        pixels,
+        args.lat,
+        args.lon,
+        args.zoom,
+        args.size,
+        args.cell_pixels,
+        args.min_coverage,
+    )
+    return write_tiles(Path(args.output), tiles, metadata, frame, tile_url, args.preserve_empty)
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="Fetch internet radar data into viz1090 radar tile cache")
+    parser.add_argument("--lat", type=float, required=True)
+    parser.add_argument("--lon", type=float, required=True)
+    parser.add_argument("--output", default="weather/radar_tiles.csv")
+    parser.add_argument("--api-url", default=RAINVIEWER_API)
+    parser.add_argument("--zoom", type=int, default=7)
+    parser.add_argument("--size", type=int, choices=(256, 512), default=512)
+    parser.add_argument("--color", type=int, default=2)
+    parser.add_argument("--smooth", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--snow", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--cell-pixels", type=int, default=6)
+    parser.add_argument("--min-coverage", type=float, default=0.15)
+    parser.add_argument("--timeout", type=float, default=12.0)
+    parser.add_argument("--preserve-empty", action="store_true")
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    try:
+        fetch_rainviewer(args)
+        return 0
+    except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError) as error:
+        print("network weather failed: %s" % error, file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

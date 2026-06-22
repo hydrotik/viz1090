@@ -183,6 +183,30 @@ With one RTL-SDR tuner, this stops `dump1090-mutability`, samples 978 MHz UAT/FI
 
 The first real capture may only populate `weather/uat_messages.jsonl`; that is still useful because it shows the actual decoded FIS-B product shape we need to support. If `SoapySDRUtil --probe` fails after the capture script exits, check whether `dump1090-mutability` restarted and reclaimed the single RTL-SDR. Do not retune the SDR during map zoom/pan; zooming should only redraw cached radar data.
 
+If UAT/FIS-B is quiet but the uConsole has internet, use the hybrid updater:
+
+```
+./run_weather_hybrid_cycle.sh --once
+```
+
+For continuous updates:
+
+```
+./run_weather_hybrid_cycle.sh
+```
+
+The hybrid updater tries RF UAT first. When RF captures decode zero messages, it fetches internet radar into the same `weather/radar_tiles.csv` cache and increases the RF retry interval up to a maximum. The network fallback currently uses RainViewer's public Weather Maps API, which is free for personal/educational/small community use, best-effort, and requires visible attribution: "Weather data by RainViewer".
+
+To diagnose the uConsole GPS path while the device sits near a window:
+
+```
+./run_gps_probe.sh --timeout 120
+```
+
+This enables the configured GPS power GPIO when available, checks gpsd, lists candidate serial devices, prints a few NMEA sentences, and reports whether a valid fix is present.
+
+For the HackerGadgets AIO board, GPS is expected on the UART path (`/dev/serial0`, `/dev/ttyS0`, or `/dev/ttyAMA0`) rather than the ClockworkPi USB control path. If the probe shows serial devices but no NMEA lines, verify that UART is enabled in `/boot/firmware/config.txt` and that `/boot/firmware/cmdline.txt` is not using `console=serial0,115200`.
+
 See [CONTROLS.md](CONTROLS.md) for the full keyboard, pointer, and uConsole physical key map. Current uConsole defaults:
 
 | uConsole control | Action |
