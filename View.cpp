@@ -906,12 +906,14 @@ SDL_Texture *View::loadRasterTileFromMbtiles(int z, int x, int y, const std::str
         const void *blob = sqlite3_column_blob(stmt, 0);
         int blobSize = sqlite3_column_bytes(stmt, 0);
         if(blob && blobSize > 0) {
-            SDL_RWops *rw = SDL_RWFromConstMem(blob, blobSize);
-            SDL_Surface *surface = rw ? IMG_Load_RW(rw, 1) : NULL;
-            surface = prepareRasterTileSurface(surface);
-            if(surface) {
-                texture = SDL_CreateTextureFromSurface(renderer, surface);
-                SDL_FreeSurface(surface);
+            if(raster_tile_min_bytes <= 0 || blobSize >= raster_tile_min_bytes) {
+                SDL_RWops *rw = SDL_RWFromConstMem(blob, blobSize);
+                SDL_Surface *surface = rw ? IMG_Load_RW(rw, 1) : NULL;
+                surface = prepareRasterTileSurface(surface);
+                if(surface) {
+                    texture = SDL_CreateTextureFromSurface(renderer, surface);
+                    SDL_FreeSurface(surface);
+                }
             }
         }
     }
@@ -2017,6 +2019,7 @@ View::View(AppData *appData){
     raster_tile_min_zoom    = 0;
     raster_tile_max_zoom    = 17;
     raster_tile_zoom_offset = 0;
+    raster_tile_min_bytes   = 2048;
     raster_tile_cache_limit = 192;
     raster_tile_clock       = 0;
     raster_tile_warning_shown = false;

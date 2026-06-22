@@ -79,6 +79,7 @@ void showHelp(void) {
 "--tile-min-zoom <z>              Minimum raster tile zoom (default: 0)\n"
 "--tile-max-zoom <z>              Maximum raster tile zoom (default: 17)\n"
 "--tile-zoom-offset <n>           Adjust chosen raster tile zoom (default: 0)\n"
+"--tile-min-bytes <n>             Skip tiny MBTiles placeholders below n bytes (default: 2048)\n"
 "--uiscale <factor>               UI global scaling (default: 1)\n"  
 "--weather-file <path>            Radar tile cache file to render\n"
 "--weather-min-pixels <n>         Minimum rendered radar cell size (default: 3)\n"
@@ -190,6 +191,13 @@ int main(int argc, char **argv) {
             requireArgs(argc, j, 1, argv[j]);
             if(!parseIntArg(argv[++j], &view.raster_tile_zoom_offset) || view.raster_tile_zoom_offset < -4 || view.raster_tile_zoom_offset > 4) {
                 fprintf(stderr, "Invalid tile zoom offset '%s'. Expected -4 to 4.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--tile-min-bytes")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.raster_tile_min_bytes) || view.raster_tile_min_bytes < 0 || view.raster_tile_min_bytes > 1000000) {
+                fprintf(stderr, "Invalid tile min bytes '%s'. Expected 0 to 1000000.\n\n", argv[j]);
                 showHelp();
                 exit(1);
             }

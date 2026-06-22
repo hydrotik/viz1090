@@ -10,6 +10,8 @@ NETWORK_ZOOM="8"
 NETWORK_CELL_PIXELS="3"
 NETWORK_MIN_COVERAGE="0.08"
 WEATHER_MIN_PIXELS="3"
+TILE_MAX_ZOOM="13"
+TILE_MIN_BYTES="2048"
 WEATHER=1
 RF_WEATHER=0
 GPS=1
@@ -40,6 +42,8 @@ Options:
   --network-cell-pixels <n>   Radar output cell size. Default: 3
   --network-min-coverage <n>  Minimum precip coverage per cell. Default: 0.08
   --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 3
+  --tile-max-zoom <z>         Maximum raster basemap zoom. Default: 13
+  --tile-min-bytes <n>        Skip tiny MBTiles placeholders below n bytes. Default: 2048
   --rf-weather                Try RF UAT/FIS-B before network fallback.
   --no-weather                Start app without the weather updater.
   --debug-weather             Print radar load/render diagnostics.
@@ -93,6 +97,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --weather-min-pixels)
             WEATHER_MIN_PIXELS="$2"
+            shift 2
+            ;;
+        --tile-max-zoom)
+            TILE_MAX_ZOOM="$2"
+            shift 2
+            ;;
+        --tile-min-bytes)
+            TILE_MIN_BYTES="$2"
             shift 2
             ;;
         --rf-weather)
@@ -173,6 +185,8 @@ app_args=(
     --lat "${LAT}"
     --lon "${LON}"
     --weather-min-pixels "${WEATHER_MIN_PIXELS}"
+    --tile-max-zoom "${TILE_MAX_ZOOM}"
+    --tile-min-bytes "${TILE_MIN_BYTES}"
 )
 
 if [[ "${GPS}" -eq 0 ]]; then
