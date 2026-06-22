@@ -61,6 +61,29 @@ class BuildRasterMbtilesTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(tile_format, "png")
 
+    def test_rejects_non_raster_tile_response(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            tile_dir = tmp_path / "source" / "0" / "0"
+            tile_dir.mkdir(parents=True)
+            (tile_dir / "0.png").write_bytes(b"\x1f\x8bnot-a-raster-tile")
+            output = tmp_path / "out.mbtiles"
+
+            with self.assertRaises(RuntimeError):
+                build_raster_mbtiles.main(
+                    [
+                        "--tile-url",
+                        "file://" + str(tmp_path / "source/{z}/{x}/{y}.png"),
+                        "--bbox=-1,-1,1,1",
+                        "--min-zoom",
+                        "0",
+                        "--max-zoom",
+                        "0",
+                        "--output",
+                        str(output),
+                    ]
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

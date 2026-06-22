@@ -39,6 +39,16 @@ def normalize_format(value):
     return value
 
 
+def detect_raster_format(data):
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return ""
+
+
 def tile_xy_for_lon_lat(lon, lat, zoom):
     lat = max(-85.05112878, min(85.05112878, lat))
     count = 2**zoom
@@ -98,7 +108,7 @@ def make_tile_url(template, z, x, y):
     return template.replace("{z}", str(z)).replace("{x}", str(x)).replace("{y}", str(y))
 
 
-def fetch_tile(template, tile, timeout, user_agent, retries):
+def fetch_tile(template, tile, timeout, user_agent, retries, expected_format):
     z, x, y = tile
     url = make_tile_url(template, z, x, y)
     headers = {"User-Agent": user_agent}
@@ -110,7 +120,16 @@ def fetch_tile(template, tile, timeout, user_agent, retries):
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 if response.status == 204 or response.status == 404:
                     return tile, None
-                return tile, response.read()
+                data = response.read()
+                tile_format = detect_raster_format(data)
+                if tile_format != expected_format:
+                    hint = "unknown"
+                    if data.startswith(b"\x1f\x8b"):
+                        hint = "gzipped vector/PBF"
+                    raise RuntimeError(
+                        "%s returned %s data, not %s raster tiles" % (url, hint, expected_format)
+                    )
+                return tile, data
         except urllib.error.HTTPError as exc:
             if exc.code in (204, 404):
                 return tile, None
@@ -174,7 +193,15 @@ def build_mbtiles(args):
         tiles = list(iter_tiles(args.bbox, args.min_zoom, args.max_zoom))
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
             futures = [
-                executor.submit(fetch_tile, args.tile_url, tile, args.timeout, args.user_agent, args.retries)
+                executor.submit(
+                    fetch_tile,
+                    args.tile_url,
+                    tile,
+                    args.timeout,
+                    args.user_agent,
+                    args.retries,
+                    args.format,
+                )
                 for tile in tiles
             ]
             for future in concurrent.futures.as_completed(futures):
