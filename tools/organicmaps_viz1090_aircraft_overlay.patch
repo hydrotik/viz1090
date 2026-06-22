@@ -13,10 +13,10 @@ index e578604..746b10b 100644
    build_style/build_common.cpp
 diff --git a/qt/aircraft_overlay.cpp b/qt/aircraft_overlay.cpp
 new file mode 100644
-index 0000000..df00fec
+index 0000000..616cd27
 --- /dev/null
 +++ b/qt/aircraft_overlay.cpp
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,401 @@
 +#include "qt/aircraft_overlay.hpp"
 +
 +#include "geometry/mercator.hpp"
@@ -26,6 +26,7 @@ index 0000000..df00fec
 +#include <QtCore/QJsonArray>
 +#include <QtCore/QJsonDocument>
 +#include <QtCore/QJsonObject>
++#include <QtCore/QStringList>
 +#include <QtGui/QBrush>
 +#include <QtGui/QColor>
 +#include <QtGui/QFont>
@@ -34,6 +35,7 @@ index 0000000..df00fec
 +#include <QtGui/QPen>
 +
 +#include <cmath>
++#include <utility>
 +
 +namespace qt
 +{
@@ -52,11 +54,38 @@ index 0000000..df00fec
 +    label = aircraft.m_icao;
 +
 +  if (aircraft.m_altitude > 0)
-+    label += QString(" %1").arg(aircraft.m_altitude);
++    label += QString(" FL%1").arg(aircraft.m_altitude / 100);
 +  if (aircraft.m_speed > 0)
 +    label += QString(" %1kt").arg(aircraft.m_speed);
 +
 +  return label;
++}
++
++QColor AircraftColor(AircraftOverlay::Aircraft const & aircraft)
++{
++  QString const flight = aircraft.m_flight.trimmed().toUpper();
++  if (flight.startsWith(QLatin1String("N")) || flight.startsWith(QLatin1String("RCH")) ||
++      flight.startsWith(QLatin1String("SAM")) || flight.startsWith(QLatin1String("PAT")))
++  {
++    return QColor(255, 168, 42, 242);
++  }
++
++  if (!flight.isEmpty())
++    return QColor(53, 255, 120, 242);
++
++  return QColor(0, 230, 255, 235);
++}
++
++QColor WeatherColor(int intensity)
++{
++  switch (intensity)
++  {
++  case 1: return QColor(30, 205, 60, 82);
++  case 2: return QColor(245, 220, 40, 100);
++  case 3: return QColor(235, 60, 35, 118);
++  case 4: return QColor(210, 55, 210, 140);
++  default: return QColor(0, 0, 0, 0);
++  }
 +}
 +
 +bool ReadNumber(QJsonObject const & object, char const * key, double & value)
@@ -81,43 +110,71 @@ index 0000000..df00fec
 +}
 +}  // namespace
 +
-+void AircraftOverlay::SetFeedPath(QString const & path)
++void AircraftOverlay::SetAircraftFeedPath(QString const & path)
 +{
-+  if (m_feedPath == path)
++  if (m_aircraftFeedPath == path)
 +    return;
 +
-+  m_feedPath = path;
-+  m_lastModified = QDateTime();
-+  m_lastSize = -1;
++  m_aircraftFeedPath = path;
++  m_aircraftLastModified = QDateTime();
++  m_aircraftLastSize = -1;
 +  m_aircraft.clear();
++  m_trails.clear();
++}
++
++void AircraftOverlay::SetWeatherFeedPath(QString const & path)
++{
++  if (m_weatherFeedPath == path)
++    return;
++
++  m_weatherFeedPath = path;
++  m_weatherLastModified = QDateTime();
++  m_weatherLastSize = -1;
++  m_weatherTiles.clear();
 +}
 +
 +void AircraftOverlay::ReloadIfChanged()
 +{
-+  if (m_feedPath.isEmpty())
-+    return;
-+
-+  QFileInfo const info(m_feedPath);
-+  if (!info.exists() || !info.isFile())
++  if (!m_aircraftFeedPath.isEmpty())
 +  {
-+    if (!m_aircraft.empty())
-+      m_aircraft.clear();
-+    m_lastModified = QDateTime();
-+    m_lastSize = -1;
-+    return;
++    QFileInfo const info(m_aircraftFeedPath);
++    if (!info.exists() || !info.isFile())
++    {
++      if (!m_aircraft.empty())
++        m_aircraft.clear();
++      m_aircraftLastModified = QDateTime();
++      m_aircraftLastSize = -1;
++    }
++    else if (info.lastModified() != m_aircraftLastModified || info.size() != m_aircraftLastSize)
++    {
++      m_aircraftLastModified = info.lastModified();
++      m_aircraftLastSize = info.size();
++      ReloadAircraft();
++    }
 +  }
 +
-+  if (info.lastModified() == m_lastModified && info.size() == m_lastSize)
-+    return;
-+
-+  m_lastModified = info.lastModified();
-+  m_lastSize = info.size();
-+  Reload();
++  if (!m_weatherFeedPath.isEmpty())
++  {
++    QFileInfo const info(m_weatherFeedPath);
++    if (!info.exists() || !info.isFile())
++    {
++      if (!m_weatherTiles.empty())
++        m_weatherTiles.clear();
++      m_weatherLastModified = QDateTime();
++      m_weatherLastSize = -1;
++    }
++    else if (info.lastModified() != m_weatherLastModified || info.size() != m_weatherLastSize)
++    {
++      m_weatherLastModified = info.lastModified();
++      m_weatherLastSize = info.size();
++      ReloadWeather();
++    }
++  }
 +}
 +
-+void AircraftOverlay::Reload()
++void AircraftOverlay::ReloadAircraft()
 +{
-+  QFile file(m_feedPath);
++  QFile file(m_aircraftFeedPath);
 +  if (!file.open(QIODevice::ReadOnly))
 +    return;
 +
@@ -154,33 +211,161 @@ index 0000000..df00fec
 +    item.m_speed = ReadInt(properties, "speed");
 +    (void)ReadNumber(properties, "track", item.m_track);
 +
-+    aircraft.push_back(std::move(item));
++    aircraft.push_back(item);
 +  }
 +
++  UpdateTrails(aircraft);
 +  m_aircraft = std::move(aircraft);
++}
++
++void AircraftOverlay::ReloadWeather()
++{
++  QFile file(m_weatherFeedPath);
++  if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
++    return;
++
++  std::vector<WeatherTile> tiles;
++  while (!file.atEnd())
++  {
++    QString const line = QString::fromUtf8(file.readLine()).trimmed();
++    if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
++      continue;
++
++    QStringList const fields = line.split(QLatin1Char(','));
++    if (fields.size() < 5)
++      continue;
++
++    bool okLatMin = false;
++    bool okLonMin = false;
++    bool okLatMax = false;
++    bool okLonMax = false;
++    bool okIntensity = false;
++
++    WeatherTile tile;
++    tile.m_latMin = fields[0].toDouble(&okLatMin);
++    tile.m_lonMin = fields[1].toDouble(&okLonMin);
++    tile.m_latMax = fields[2].toDouble(&okLatMax);
++    tile.m_lonMax = fields[3].toDouble(&okLonMax);
++    tile.m_intensity = fields[4].toInt(&okIntensity);
++
++    if (!okLatMin || !okLonMin || !okLatMax || !okLonMax || !okIntensity)
++      continue;
++    if (!mercator::ValidLat(tile.m_latMin) || !mercator::ValidLat(tile.m_latMax) ||
++        !mercator::ValidLon(tile.m_lonMin) || !mercator::ValidLon(tile.m_lonMax) || tile.m_intensity < 1)
++      continue;
++
++    if (tile.m_latMin > tile.m_latMax)
++      std::swap(tile.m_latMin, tile.m_latMax);
++    if (tile.m_lonMin > tile.m_lonMax)
++      std::swap(tile.m_lonMin, tile.m_lonMax);
++
++    tiles.push_back(tile);
++  }
++
++  m_weatherTiles = std::move(tiles);
++}
++
++void AircraftOverlay::UpdateTrails(std::vector<Aircraft> const & aircraft)
++{
++  static size_t constexpr kMaxTrailPoints = 18;
++  std::map<QString, bool> seen;
++
++  for (auto const & item : aircraft)
++  {
++    QString key = item.m_icao.trimmed();
++    if (key.isEmpty())
++      key = item.m_flight.trimmed();
++    if (key.isEmpty())
++      continue;
++
++    seen[key] = true;
++    auto & trail = m_trails[key];
++    if (trail.empty() || std::fabs(trail.back().m_lat - item.m_lat) > 0.00001 ||
++        std::fabs(trail.back().m_lon - item.m_lon) > 0.00001)
++    {
++      trail.push_back(item);
++    }
++
++    while (trail.size() > kMaxTrailPoints)
++      trail.erase(trail.begin());
++  }
++
++  for (auto it = m_trails.begin(); it != m_trails.end();)
++  {
++    if (seen.find(it->first) == seen.end())
++      it = m_trails.erase(it);
++    else
++      ++it;
++  }
 +}
 +
 +void AircraftOverlay::Draw(QPainter & painter, QRect const & viewport, ScreenBase const & screen, double devicePixelRatio,
 +                           int drawScale) const
 +{
-+  if (m_aircraft.empty() || devicePixelRatio <= 0.0)
++  if (devicePixelRatio <= 0.0)
 +    return;
 +
 +  painter.save();
 +  painter.setRenderHint(QPainter::Antialiasing, true);
 +
-+  QPen markerPen(QColor(0, 25, 30, 220));
-+  markerPen.setWidthF(1.4);
-+  painter.setPen(markerPen);
-+  painter.setBrush(QColor(0, 230, 255, 230));
++  painter.setPen(Qt::NoPen);
++  for (auto const & tile : m_weatherTiles)
++  {
++    QColor const color = WeatherColor(tile.m_intensity);
++    if (color.alpha() == 0)
++      continue;
++
++    m2::PointD const topLeftDevice = screen.GtoP(mercator::FromLatLon(tile.m_latMax, tile.m_lonMin));
++    m2::PointD const bottomRightDevice = screen.GtoP(mercator::FromLatLon(tile.m_latMin, tile.m_lonMax));
++    QRectF rect(QPointF(topLeftDevice.x / devicePixelRatio, topLeftDevice.y / devicePixelRatio),
++                QPointF(bottomRightDevice.x / devicePixelRatio, bottomRightDevice.y / devicePixelRatio));
++    rect = rect.normalized().adjusted(-0.75, -0.75, 0.75, 0.75);
++    if (viewport.intersects(rect.toAlignedRect()))
++    {
++      painter.setBrush(color);
++      painter.drawRect(rect);
++    }
++  }
++
++  QPen trailPen(QColor(0, 238, 255, 118));
++  trailPen.setWidthF(drawScale >= 11 ? 2.0 : 1.4);
++  trailPen.setCapStyle(Qt::RoundCap);
++  trailPen.setJoinStyle(Qt::RoundJoin);
++  painter.setPen(trailPen);
++  painter.setBrush(Qt::NoBrush);
++
++  for (auto const & pair : m_trails)
++  {
++    auto const & trail = pair.second;
++    if (trail.size() < 2)
++      continue;
++
++    QPainterPath path;
++    bool started = false;
++    for (auto const & item : trail)
++    {
++      m2::PointD const devicePoint = screen.GtoP(mercator::FromLatLon(item.m_lat, item.m_lon));
++      QPointF const point(devicePoint.x / devicePixelRatio, devicePoint.y / devicePixelRatio);
++      if (!started)
++      {
++        path.moveTo(point);
++        started = true;
++      }
++      else
++      {
++        path.lineTo(point);
++      }
++    }
++    painter.drawPath(path);
++  }
 +
 +  QFont labelFont = painter.font();
-+  labelFont.setPointSize(drawScale >= 11 ? 12 : 10);
++  labelFont.setPointSize(drawScale >= 11 ? 13 : 10);
 +  labelFont.setBold(true);
 +  painter.setFont(labelFont);
 +
 +  QPen labelPen(QColor(235, 255, 255, 245));
-+  QBrush labelBackground(QColor(0, 20, 24, 180));
++  QBrush labelBackground(QColor(0, 16, 20, 198));
 +  bool const drawLabels = drawScale >= 10;
 +
 +  for (auto const & aircraft : m_aircraft)
@@ -191,14 +376,24 @@ index 0000000..df00fec
 +    if (!viewport.adjusted(-32, -32, 32, 32).contains(point.toPoint()))
 +      continue;
 +
++    QColor const aircraftColor = AircraftColor(aircraft);
++    QPen markerPen(QColor(0, 18, 22, 235));
++    markerPen.setWidthF(1.6);
++    painter.setPen(markerPen);
++    painter.setBrush(aircraftColor);
++
 +    double const angle = DegToRad(aircraft.m_track);
-+    QPointF const nose(std::sin(angle) * 10.0, -std::cos(angle) * 10.0);
-+    QPointF const left(std::sin(angle + 2.45) * 7.0, -std::cos(angle + 2.45) * 7.0);
-+    QPointF const right(std::sin(angle - 2.45) * 7.0, -std::cos(angle - 2.45) * 7.0);
++    double const markerScale = drawScale >= 11 ? 1.25 : 1.0;
++    QPointF const nose(std::sin(angle) * 11.0 * markerScale, -std::cos(angle) * 11.0 * markerScale);
++    QPointF const tail(std::sin(angle + 3.14159265358979323846) * 7.0 * markerScale,
++                       -std::cos(angle + 3.14159265358979323846) * 7.0 * markerScale);
++    QPointF const left(std::sin(angle + 2.25) * 8.5 * markerScale, -std::cos(angle + 2.25) * 8.5 * markerScale);
++    QPointF const right(std::sin(angle - 2.25) * 8.5 * markerScale, -std::cos(angle - 2.25) * 8.5 * markerScale);
 +
 +    QPainterPath marker;
 +    marker.moveTo(point + nose);
 +    marker.lineTo(point + left);
++    marker.lineTo(point + tail);
 +    marker.lineTo(point + right);
 +    marker.closeSubpath();
 +    painter.drawPath(marker);
@@ -217,8 +412,6 @@ index 0000000..df00fec
 +    painter.drawRoundedRect(placedLabel, 4, 4);
 +    painter.setPen(labelPen);
 +    painter.drawText(placedLabel.adjusted(5, 2, -5, -2), Qt::AlignLeft | Qt::AlignVCenter, label);
-+    painter.setPen(markerPen);
-+    painter.setBrush(QColor(0, 230, 255, 230));
 +  }
 +
 +  painter.restore();
@@ -227,10 +420,10 @@ index 0000000..df00fec
 +}  // namespace qt
 diff --git a/qt/aircraft_overlay.hpp b/qt/aircraft_overlay.hpp
 new file mode 100644
-index 0000000..e861233
+index 0000000..f512e96
 --- /dev/null
 +++ b/qt/aircraft_overlay.hpp
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,68 @@
 +#pragma once
 +
 +#include "geometry/screenbase.hpp"
@@ -238,6 +431,7 @@ index 0000000..e861233
 +#include <QtCore/QDateTime>
 +#include <QtCore/QString>
 +
++#include <map>
 +#include <vector>
 +
 +class QPainter;
@@ -260,26 +454,46 @@ index 0000000..e861233
 +    QString m_flight;
 +  };
 +
-+  void SetFeedPath(QString const & path);
-+  bool IsEnabled() const { return !m_feedPath.isEmpty(); }
++  struct WeatherTile
++  {
++    double m_latMin = 0.0;
++    double m_lonMin = 0.0;
++    double m_latMax = 0.0;
++    double m_lonMax = 0.0;
++    int m_intensity = 0;
++  };
++
++  void SetFeedPath(QString const & path) { SetAircraftFeedPath(path); }
++  void SetAircraftFeedPath(QString const & path);
++  void SetWeatherFeedPath(QString const & path);
++  bool IsEnabled() const { return !m_aircraftFeedPath.isEmpty() || !m_weatherFeedPath.isEmpty(); }
 +  size_t GetAircraftCount() const { return m_aircraft.size(); }
++  size_t GetWeatherTileCount() const { return m_weatherTiles.size(); }
 +
 +  void ReloadIfChanged();
 +  void Draw(QPainter & painter, QRect const & viewport, ScreenBase const & screen, double devicePixelRatio,
 +            int drawScale) const;
 +
 +private:
-+  void Reload();
++  void ReloadAircraft();
++  void ReloadWeather();
++  void UpdateTrails(std::vector<Aircraft> const & aircraft);
 +
-+  QString m_feedPath;
-+  QDateTime m_lastModified;
-+  qint64 m_lastSize = -1;
++  QString m_aircraftFeedPath;
++  QDateTime m_aircraftLastModified;
++  qint64 m_aircraftLastSize = -1;
 +  std::vector<Aircraft> m_aircraft;
++  std::map<QString, std::vector<Aircraft>> m_trails;
++
++  QString m_weatherFeedPath;
++  QDateTime m_weatherLastModified;
++  qint64 m_weatherLastSize = -1;
++  std::vector<WeatherTile> m_weatherTiles;
 +};
 +
 +}  // namespace qt
 diff --git a/qt/draw_widget.cpp b/qt/draw_widget.cpp
-index 44d7931..224f55a 100644
+index 44d7931..a1788b9 100644
 --- a/qt/draw_widget.cpp
 +++ b/qt/draw_widget.cpp
 @@ -34,6 +34,7 @@
@@ -290,23 +504,24 @@ index 44d7931..224f55a 100644
  #include <QtWidgets/QApplication>
  #include <QtWidgets/QDialog>
  #include <QtWidgets/QDialogButtonBox>
-@@ -91,12 +92,14 @@ df::TouchEvent::ETouchType qtTouchEventTypeToDfTouchEventType(QEvent::Type qEven
+@@ -91,12 +92,15 @@ df::TouchEvent::ETouchType qtTouchEventTypeToDfTouchEventType(QEvent::Type qEven
  #endif
  }  // namespace
  
 -DrawWidget::DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QWidget * parent)
 +DrawWidget::DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams,
-+                       QString const & aircraftFeedPath, QWidget * parent)
++                       QString const & aircraftFeedPath, QString const & weatherFeedPath, QWidget * parent)
    : TBase(framework, screenshotParams != nullptr, parent)
    , m_rubberBand(nullptr)
    , m_emulatingLocation(false)
  {
    setFocusPolicy(Qt::StrongFocus);
-+  m_aircraftOverlay.SetFeedPath(aircraftFeedPath);
++  m_aircraftOverlay.SetAircraftFeedPath(aircraftFeedPath);
++  m_aircraftOverlay.SetWeatherFeedPath(weatherFeedPath);
  
    m_framework.SetPlacePageListeners([this]() { ShowPlacePage(); }, {} /* onClose */, {} /* onUpdate */,
                                      {} /*onSwitchFullScreen */);
-@@ -192,6 +195,19 @@ void DrawWidget::initializeGL()
+@@ -192,6 +196,19 @@ void DrawWidget::initializeGL()
      m_screenshoter->Start();
  }
  
@@ -327,7 +542,7 @@ index 44d7931..224f55a 100644
  {
  #if !defined(OMIM_OS_LINUX)
 diff --git a/qt/draw_widget.hpp b/qt/draw_widget.hpp
-index c1d826f..41668a5 100644
+index c1d826f..00d5331 100644
 --- a/qt/draw_widget.hpp
 +++ b/qt/draw_widget.hpp
 @@ -1,5 +1,6 @@
@@ -342,8 +557,8 @@ index c1d826f..41668a5 100644
  
  public:
 -  DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QWidget * parent);
-+  DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QString const & aircraftFeedPath,
-+             QWidget * parent);
++  DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams,
++             QString const & aircraftFeedPath, QString const & weatherFeedPath, QWidget * parent);
    ~DrawWidget() override;
  
    std::string GetDistance(search::Result const & res) const;
@@ -364,29 +579,31 @@ index c1d826f..41668a5 100644
  };
  }  // namespace qt
 diff --git a/qt/main.cpp b/qt/main.cpp
-index ccdc69a..c1de826 100644
+index ccdc69a..975f539 100644
 --- a/qt/main.cpp
 +++ b/qt/main.cpp
-@@ -50,6 +50,7 @@ DEFINE_int32(height, 0, "Screenshot height.");
+@@ -50,6 +50,8 @@ DEFINE_int32(height, 0, "Screenshot height.");
  DEFINE_double(
      dpi_scale, 0.0,
      "Screenshot dpi scale (mdpi = 1.0, hdpi = 1.5, xhdpiScale = 2.0, 6plus = 2.4, xxhdpi = 3.0, xxxhdpi = 3.5).");
 +DEFINE_string(viz1090_aircraft_feed, "", "Path to a viz1090 aircraft GeoJSON feed to render as a map overlay.");
++DEFINE_string(viz1090_weather_feed, "", "Path to a viz1090 radar tile CSV feed to render below aircraft.");
  
  namespace
  {
-@@ -241,7 +242,8 @@ int main(int argc, char * argv[])
+@@ -241,7 +243,9 @@ int main(int argc, char * argv[])
          qt::common::ApplySystemNightMode(framework);
      };
      syncNightMode();
 -    qt::MainWindow w(framework, std::move(screenshotParams), QApplication::primaryScreen()->geometry()
 +    qt::MainWindow w(framework, std::move(screenshotParams), QApplication::primaryScreen()->geometry(),
-+                     QString::fromStdString(FLAGS_viz1090_aircraft_feed)
++                     QString::fromStdString(FLAGS_viz1090_aircraft_feed),
++                     QString::fromStdString(FLAGS_viz1090_weather_feed)
  #ifdef BUILD_DESIGNER
                                                                   ,
                       mapcssFilePath
 diff --git a/qt/mainwindow.cpp b/qt/mainwindow.cpp
-index 7492252..02a40bf 100644
+index 7492252..6deba5b 100644
 --- a/qt/mainwindow.cpp
 +++ b/qt/mainwindow.cpp
 @@ -99,7 +99,7 @@ T * CreateBlackControl(QString const & name)
@@ -394,7 +611,7 @@ index 7492252..02a40bf 100644
  
  MainWindow::MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams,
 -                       QRect const & screenGeometry
-+                       QRect const & screenGeometry, QString const & aircraftFeedPath
++                       QRect const & screenGeometry, QString const & aircraftFeedPath, QString const & weatherFeedPath
  #ifdef BUILD_DESIGNER
                         ,
                         QString const & mapcssFilePath
@@ -403,12 +620,12 @@ index 7492252..02a40bf 100644
    int const width = m_screenshotMode ? static_cast<int>(screenshotParams->m_width) : 0;
    int const height = m_screenshotMode ? static_cast<int>(screenshotParams->m_height) : 0;
 -  m_pDrawWidget = new DrawWidget(framework, std::move(screenshotParams), this);
-+  m_pDrawWidget = new DrawWidget(framework, std::move(screenshotParams), aircraftFeedPath, this);
++  m_pDrawWidget = new DrawWidget(framework, std::move(screenshotParams), aircraftFeedPath, weatherFeedPath, this);
  
    setCentralWidget(m_pDrawWidget);
  
 diff --git a/qt/mainwindow.hpp b/qt/mainwindow.hpp
-index 2c25996..f6edf1b 100644
+index 2c25996..0625aed 100644
 --- a/qt/mainwindow.hpp
 +++ b/qt/mainwindow.hpp
 @@ -8,6 +8,7 @@
@@ -425,7 +642,7 @@ index 2c25996..f6edf1b 100644
  public:
 -  MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QRect const & screenGeometry
 +  MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QRect const & screenGeometry,
-+             QString const & aircraftFeedPath
++             QString const & aircraftFeedPath, QString const & weatherFeedPath
  #ifdef BUILD_DESIGNER
               ,
               QString const & mapcssFilePath = QString()

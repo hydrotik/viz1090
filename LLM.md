@@ -164,7 +164,8 @@ Organic Maps integration path:
 - Run viz1090/dump1090 as the aviation data producer and Organic Maps as the primary map renderer.
 - viz1090 supports `--organic-feed <path>` and `--organic-feed-interval-ms <ms>` to write compact aircraft GeoJSON for an Organic Maps overlay patch.
 - Prefer `/run/user/$(id -u)/viz1090-aircraft.geojson` on the uConsole so the feed is tmpfs-backed and avoids SD-card churn.
-- The Organic Maps desktop patch adds `--viz1090_aircraft_feed <path>`, polls by mtime/size, parses only the GeoJSON properties emitted by `OrganicMapsFeed`, and draws lightweight aircraft symbols/zoom-gated labels above the map.
+- The Organic Maps desktop patch adds `--viz1090_aircraft_feed <path>` and `--viz1090_weather_feed <path>`, polls by mtime/size, parses only the GeoJSON properties emitted by `OrganicMapsFeed` plus the radar CSV format `lat_min,lon_min,lat_max,lon_max,intensity`, and draws weather cells, aircraft trails, aircraft symbols, and zoom-gated labels above the map.
+- Use `tools/bridge_uconsole_feeds.sh djdonovan@192.168.1.195` from the Mac to mirror `/run/user/1000/viz1090-aircraft.geojson` and `/home/djdonovan/viz1090/weather/radar_tiles.csv` into `/tmp` over one persistent SSH session.
 - Keep SDR, Beast decoding, weather capture, and ADS-B classification out of Organic Maps. Those remain in viz1090/dump1090-side tooling.
 - Organic Maps binary data files require visible Organic Maps and OpenStreetMap attribution if used in a distributed app.
 

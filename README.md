@@ -167,10 +167,26 @@ For the Organic Maps path, use Organic Maps as the primary offline map/navigatio
 
 ```
 tools/bootstrap_organicmaps.sh
+tools/apply_organicmaps_overlay.sh
+tools/build_organicmaps_macos.sh
 ./run_uconsole.sh --organic-feed /run/user/$(id -u)/viz1090-aircraft.geojson
 ```
 
-The feed is compact GeoJSON and is written atomically for a future Organic Maps overlay layer. See [ORGANIC_MAPS.md](ORGANIC_MAPS.md).
+The aircraft feed is compact GeoJSON and is written atomically for the patched Organic Maps overlay layer. Weather uses the existing radar CSV cache. From the Mac, mirror both uConsole feeds with one SSH session:
+
+```
+tools/bridge_uconsole_feeds.sh djdonovan@192.168.1.195
+```
+
+Then launch the patched Organic Maps desktop app:
+
+```
+external/omim-build-arm64/omim-build-release/OMaps.app/Contents/MacOS/OMaps \
+  --viz1090_aircraft_feed /tmp/viz1090-aircraft.geojson \
+  --viz1090_weather_feed /tmp/viz1090-radar_tiles.csv
+```
+
+See [ORGANIC_MAPS.md](ORGANIC_MAPS.md).
 
 If you previously generated only the smaller NYC or Northeast map, force the new high-detail US map once:
 

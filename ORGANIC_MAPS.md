@@ -57,24 +57,24 @@ It adds the Organic Maps desktop flag:
 
 ```sh
 --viz1090_aircraft_feed <path>
+--viz1090_weather_feed <path>
 ```
 
-Run the patched Mac app against a local copy of the uConsole feed with:
+Run the patched Mac app against local copies of the uConsole feeds with:
 
 ```sh
 external/omim-build-arm64/omim-build-release/OMaps.app/Contents/MacOS/OMaps \
-  --viz1090_aircraft_feed /tmp/viz1090-aircraft.geojson
+  --viz1090_aircraft_feed /tmp/viz1090-aircraft.geojson \
+  --viz1090_weather_feed /tmp/viz1090-radar_tiles.csv
 ```
 
-For a quick live Mac-side check while the feed is produced on the uConsole, copy it over SSH in a loop:
+For a live Mac-side check while feeds are produced on the uConsole, bridge aircraft and weather over one SSH session:
 
 ```sh
-while true; do
-  scp djdonovan@192.168.1.195:/run/user/1000/viz1090-aircraft.geojson /tmp/viz1090-aircraft.geojson.tmp &&
-    mv /tmp/viz1090-aircraft.geojson.tmp /tmp/viz1090-aircraft.geojson
-  sleep 1
-done
+tools/bridge_uconsole_feeds.sh djdonovan@192.168.1.195
 ```
+
+This writes `/tmp/viz1090-aircraft.geojson` and `/tmp/viz1090-radar_tiles.csv` locally. It prompts for the SSH password once if key auth is not configured.
 
 ## ADS-B Overlay Feed
 
@@ -129,10 +129,10 @@ The feed shape is a GeoJSON `FeatureCollection` of point features:
 The current Organic Maps patch is intentionally narrow:
 
 1. Adds `--viz1090_aircraft_feed`.
-2. Polls the file by mtime/size from the Qt draw path.
-3. Parses only the GeoJSON fields emitted by viz1090.
-4. Draws aircraft markers above the desktop Organic Maps map using the current viewport projection.
-5. Shows compact labels only when the map is zoomed in enough.
+2. Adds `--viz1090_weather_feed`.
+3. Polls both files by mtime/size from the Qt draw path.
+4. Parses only the GeoJSON and radar CSV fields emitted by viz1090.
+5. Draws weather cells, aircraft trails, aircraft markers, and compact labels above the desktop Organic Maps map using the current viewport projection.
 
 Do not add SDR, dump1090, or Beast decoding code to Organic Maps. Keep RF and aviation protocol handling in viz1090/dump1090.
 
@@ -143,11 +143,11 @@ Do not add SDR, dump1090, or Beast decoding code to Organic Maps. Keep RF and av
 - Keep feed writes throttled. 500 ms is already aggressive enough for local aircraft motion.
 - Avoid large labels at low zoom. Draw dots/triangles first; show labels only when zoomed in or selected.
 - Do not poll map/weather/radio state from the Organic Maps render loop; use a timer or background task.
-- Keep network/weather fallback separate from Organic Maps until the ADS-B overlay is stable.
+- Keep RF/weather updates outside the Organic Maps render loop; Organic Maps should only render cached weather.
 
 ## Near-Term Work
 
 - Validate the patched desktop overlay visually with a live copied uConsole feed.
 - Decide whether to run patched Organic Maps on the uConsole or keep it as the Mac/high-fidelity view.
 - If uConsole runtime is acceptable, build/test the patched Organic Maps checkout on Linux/aarch64.
-- Only after aircraft overlay is stable, consider moving weather radar into the same Organic Maps overlay path.
+- Tune weather opacity and label density after seeing real traffic/weather on the uConsole.
