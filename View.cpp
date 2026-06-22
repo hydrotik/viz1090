@@ -1208,18 +1208,18 @@ void View::drawGeography() {
 
 static SDL_Color weatherColorForIntensity(int intensity) {
     if(intensity >= 4) {
-        return {255, 40, 255, 240};
+        return {255, 40, 255, 205};
     }
 
     if(intensity == 3) {
-        return {255, 50, 35, 235};
+        return {255, 50, 35, 190};
     }
 
     if(intensity == 2) {
-        return {255, 220, 0, 230};
+        return {255, 220, 0, 160};
     }
 
-    return {35, 255, 85, 220};
+    return {35, 255, 85, 105};
 }
 
 void View::loadWeatherTiles() {

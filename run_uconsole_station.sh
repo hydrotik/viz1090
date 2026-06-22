@@ -4,6 +4,7 @@ set -euo pipefail
 LAT="40.723972"
 LON="-73.845139"
 TILES="mapdata/tiles/nyc-raster.mbtiles"
+USE_TILES=1
 MAP_PROFILE="us-hd"
 WEATHER_BBOX="-75,39.8,-71.8,42.2"
 NETWORK_ZOOM="8"
@@ -33,6 +34,7 @@ One-command uConsole workflow:
 
 Options:
   --tiles <path>              Raster MBTiles file. Default: mapdata/tiles/nyc-raster.mbtiles
+  --no-tiles                  Use generated vector map only.
   --map-profile <name>        Passed to run_uconsole.sh. Default: us-hd
   --lat <value>               Fallback latitude. Default: 40.723972
   --lon <value>               Fallback longitude. Default: -73.845139
@@ -57,7 +59,12 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --tiles)
             TILES="$2"
+            USE_TILES=1
             shift 2
+            ;;
+        --no-tiles)
+            USE_TILES=0
+            shift
             ;;
         --map-profile)
             MAP_PROFILE="$2"
@@ -179,8 +186,6 @@ if [[ "${WEATHER}" -eq 1 ]]; then
 fi
 
 app_args=(
-    --osm-mode
-    --tiles "${TILES}"
     --map-profile "${MAP_PROFILE}"
     --lat "${LAT}"
     --lon "${LON}"
@@ -188,6 +193,14 @@ app_args=(
     --tile-max-zoom "${TILE_MAX_ZOOM}"
     --tile-min-bytes "${TILE_MIN_BYTES}"
 )
+
+if [[ "${USE_TILES}" -eq 1 ]]; then
+    app_args=(
+        --osm-mode
+        --tiles "${TILES}"
+        "${app_args[@]}"
+    )
+fi
 
 if [[ "${GPS}" -eq 0 ]]; then
     app_args+=(--no-gps)
