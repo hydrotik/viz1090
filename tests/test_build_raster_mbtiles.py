@@ -84,6 +84,23 @@ class BuildRasterMbtilesTests(unittest.TestCase):
                     ]
                 )
 
+    def test_rejects_placeholder_tile_url(self):
+        with self.assertRaises(SystemExit):
+            build_raster_mbtiles.main(
+                [
+                    "--tile-url",
+                    "PASTE_WORKING_URL_WITH_{z}_{x}_{y}_HERE",
+                    "--bbox=-1,-1,1,1",
+                    "--min-zoom",
+                    "0",
+                    "--max-zoom",
+                    "0",
+                    "--output",
+                    "unused.mbtiles",
+                    "--dry-run",
+                ]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

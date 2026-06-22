@@ -7,6 +7,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 from pathlib import Path
 from math import atan, floor, log, pi, radians, sinh, tan, cos
 
@@ -106,6 +107,15 @@ def open_mbtiles(path, metadata):
 
 def make_tile_url(template, z, x, y):
     return template.replace("{z}", str(z)).replace("{x}", str(x)).replace("{y}", str(y))
+
+
+def validate_tile_url_template(template):
+    if "{z}" not in template or "{x}" not in template or "{y}" not in template:
+        raise SystemExit("--tile-url must include {z}, {x}, and {y}")
+
+    parsed = urllib.parse.urlparse(template)
+    if parsed.scheme not in ("http", "https", "file"):
+        raise SystemExit("--tile-url must be an http, https, or file URL template")
 
 
 def fetch_tile(template, tile, timeout, user_agent, retries, expected_format):
@@ -249,8 +259,7 @@ def main(argv=None):
         raise SystemExit("zoom range must be 0 <= min_zoom <= max_zoom <= 22")
     if args.jobs < 1:
         raise SystemExit("--jobs must be at least 1")
-    if "{z}" not in args.tile_url or "{x}" not in args.tile_url or "{y}" not in args.tile_url:
-        raise SystemExit("--tile-url must include {z}, {x}, and {y}")
+    validate_tile_url_template(args.tile_url)
 
     return build_mbtiles(args)
 
