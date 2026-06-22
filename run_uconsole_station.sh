@@ -179,4 +179,4 @@ if [[ "${REGEN_MAP}" -eq 1 ]]; then
     app_args+=(--regen-map)
 fi
 
-exec ./run_uconsole.sh "${app_args[@]}" "${APP_EXTRA[@]}"
+./run_uconsole.sh "${app_args[@]}" "${APP_EXTRA[@]}"
