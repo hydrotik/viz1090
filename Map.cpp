@@ -283,7 +283,8 @@ static void buildLayerTree(Map *map, QuadTree *root, float *points, int count, i
     (*processed)++;
 
     if(total > 0) {
-      map->loaded = floor(100.0f * (float)(*processed) / (float)total);
+      int progress = floor(100.0f * (float)(*processed) / (float)total);
+      map->loaded = progress < 100 ? progress : 99;
     }
   }
 }

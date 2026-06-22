@@ -617,6 +617,10 @@ void View::drawScaleBars()
 
 
 void View::drawLines(int left, int top, int right, int bottom, int bailTime) {
+    if(map.loaded < 100) {
+        return;
+    }
+
     float screen_lat_min, screen_lat_max, screen_lon_min, screen_lon_max;
 
     latLonFromScreenCoords(&screen_lat_min, &screen_lon_min, left, top);
@@ -709,6 +713,9 @@ void View::drawLinesRecursive(QuadTree *tree, float screen_lat_min, float screen
 }
 
 void View::drawPlaceNames() {
+    if(map.loaded < 100) {
+        return;
+    }
 
     //pre-generating labels in map will trade memory for TTF calls - need to compare when there are a lot of labels on screen
 
