@@ -30,6 +30,44 @@ def service_command(action, service, use_sudo):
     return run_command(command)
 
 
+def run_probe_command(command):
+    print("+ %s" % " ".join(command), flush=True)
+    completed = subprocess.run(command)
+    if completed.returncode != 0:
+        print("command exited with status %d: %s" % (completed.returncode, " ".join(command)))
+    return completed.returncode
+
+
+def diagnose(args):
+    failures = 0
+
+    dump978_bin = shutil.which(args.dump978_bin)
+    if dump978_bin:
+        print("found %s at %s" % (args.dump978_bin, dump978_bin))
+    else:
+        print("%s not found; run tools/install_dump978_fa.sh first" % args.dump978_bin)
+        failures += 1
+
+    soapy_bin = shutil.which("SoapySDRUtil")
+    if soapy_bin:
+        print("found SoapySDRUtil at %s" % soapy_bin)
+        failures += run_probe_command([soapy_bin, "--find"])
+        failures += run_probe_command([soapy_bin, "--probe=%s" % args.sdr])
+    else:
+        print("SoapySDRUtil not found; install soapysdr-tools")
+        failures += 1
+
+    if shutil.which("rtl_test"):
+        print("rtl_test is installed. Run it only while dump1090-mutability is stopped.")
+
+    if failures == 0:
+        print("UAT diagnostics completed successfully")
+    else:
+        print("UAT diagnostics found %d issue(s)" % failures)
+
+    return 0 if failures == 0 else 1
+
+
 def wait_for_port(host, port, timeout):
     deadline = time.monotonic() + timeout
     last_error = None
@@ -48,6 +86,7 @@ def wait_for_port(host, port, timeout):
 
 def parse_json_stream(sock, duration, capture_log):
     deadline = time.monotonic() + duration
+    next_progress = time.monotonic() + 15.0
     buffer = ""
     messages = 0
 
@@ -59,6 +98,11 @@ def parse_json_stream(sock, duration, capture_log):
 
     try:
         while time.monotonic() < deadline:
+            if time.monotonic() >= next_progress:
+                remaining = max(0, int(deadline - time.monotonic()))
+                print("listening for UAT JSON... %ds remaining, %d message(s) captured" % (remaining, messages), flush=True)
+                next_progress = time.monotonic() + 15.0
+
             try:
                 chunk = sock.recv(4096)
             except socket.timeout:
@@ -241,6 +285,7 @@ def build_parser():
     parser.add_argument("--weather-file", default="weather/radar_tiles.csv")
     parser.add_argument("--capture-log", default="weather/uat_messages.jsonl")
     parser.add_argument("--write-empty", action="store_true", help="overwrite weather file even when no radar tiles are decoded")
+    parser.add_argument("--diagnose", action="store_true", help="stop ADS-B service, probe dump978-fa/SoapySDR, then restart service")
     parser.add_argument("--service", default="dump1090-mutability")
     parser.add_argument("--service-control", action="store_true", help="stop/start ADS-B service around UAT capture")
     parser.add_argument("--no-sudo", action="store_true", help="do not prefix service commands with sudo")
@@ -254,6 +299,9 @@ def main(argv=None):
     try:
         if args.service_control:
             service_command("stop", args.service, use_sudo)
+
+        if args.diagnose:
+            return diagnose(args)
 
         return collect_weather(args)
     except KeyboardInterrupt:

@@ -227,6 +227,14 @@ Near-term radar-only weather plan:
 4. Inspect real `weather/uat_messages.jsonl` captures and extend `tools/uat_weather_cycle.py` for the exact FIS-B/NEXRAD JSON product shape emitted by the installed decoder.
 5. Defer non-radar products such as lightning, cloud tops, icing, turbulence, NOTAMs, and text weather until the radar path is proven.
 
+uConsole UAT diagnostics:
+
+- The HackerGadgets AIO RTL-SDR has appeared as serial `25062501`; prefer `--sdr 'driver=rtlsdr,serial=25062501'` when testing UAT weather.
+- Run `./run_uat_weather_cycle.sh --diagnose --sdr 'driver=rtlsdr,serial=25062501'` before live weather captures. This stops `dump1090-mutability`, probes `dump978-fa` and SoapySDR, then restarts the ADS-B service.
+- `SoapySDRUtil --probe` will fail with `usb_claim_interface error -6` if `dump1090-mutability` already owns the single RTL-SDR. That is expected after the capture script restarts ADS-B service.
+- The UAT capture script now prints JSON capture progress every 15 seconds. Let the capture complete unless it is clearly wedged.
+- Zooming/panning the map should not retune the SDR. The app should render cached weather data; SDR retuning should happen on a timed/manual weather capture cycle.
+
 Weather UI validation:
 
 - `--simulate-weather` draws a simulated moving NEXRAD-like radar tile grid over the map under aircraft.

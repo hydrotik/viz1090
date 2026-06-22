@@ -5,6 +5,7 @@ DURATION="75"
 INTERVAL="240"
 LOOP=0
 SERVICE_CONTROL=1
+DIAGNOSE=0
 WEATHER_FILE="weather/radar_tiles.csv"
 CAPTURE_LOG="weather/uat_messages.jsonl"
 SDR="driver=rtlsdr"
@@ -23,9 +24,11 @@ Options:
   --interval <sec>       Delay between captures in --loop mode. Default: 240
   --loop                 Repeat forever.
   --no-service-control   Do not stop/start dump1090-mutability.
+  --diagnose             Stop ADS-B service, probe dump978-fa/SoapySDR, then restart it.
   --weather-file <path>  Radar tile cache. Default: weather/radar_tiles.csv
   --capture-log <path>   Raw dump978-fa JSON log. Default: weather/uat_messages.jsonl
   --sdr <args>           SoapySDR device args. Default: driver=rtlsdr
+                         uConsole AIO example: driver=rtlsdr,serial=25062501
   --help                 Show this help.
 EOF
 }
@@ -46,6 +49,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-service-control)
             SERVICE_CONTROL=0
+            shift
+            ;;
+        --diagnose)
+            DIAGNOSE=1
             shift
             ;;
         --weather-file)
@@ -86,6 +93,9 @@ run_once() {
 
     if [[ "${SERVICE_CONTROL}" -eq 1 ]]; then
         args+=(--service-control)
+    fi
+    if [[ "${DIAGNOSE}" -eq 1 ]]; then
+        args+=(--diagnose)
     fi
 
     python3 tools/uat_weather_cycle.py "${args[@]}" "${EXTRA_ARGS[@]}"
