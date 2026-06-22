@@ -29,6 +29,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#ifndef AIRCRAFTLIST_H
+#define AIRCRAFTLIST_H
+
 #include "Aircraft.h"
 
 #include "dump1090.h" //for Modes
@@ -43,3 +46,5 @@ class AircraftList {
 		AircraftList();
 		~AircraftList();
 };
+
+#endif

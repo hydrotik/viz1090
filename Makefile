@@ -30,8 +30,8 @@ LIBS= -lm $(SDL_LIBS) $(SDL_IMAGE_LIBS) $(SQLITE_LIBS) -lpthread -g
 
 all: viz1090
 
-APP_OBJS = viz1090.o AppData.o AircraftList.o Aircraft.o Label.o AircraftLabel.o anet.o interactive.o mode_ac.o mode_s.o net_io.o Input.o View.o Map.o parula.o monokai.o
-CORE_TEST_OBJS = tests/core_tests.o AircraftList.o Aircraft.o Map.o interactive.o mode_ac.o mode_s.o
+APP_OBJS = viz1090.o AppData.o AircraftList.o Aircraft.o Label.o AircraftLabel.o OrganicMapsFeed.o anet.o interactive.o mode_ac.o mode_s.o net_io.o Input.o View.o Map.o parula.o monokai.o
+CORE_TEST_OBJS = tests/core_tests.o AircraftList.o Aircraft.o Map.o OrganicMapsFeed.o AppData.o anet.o interactive.o mode_ac.o mode_s.o net_io.o
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRACFLAGS) -c $< -o $@

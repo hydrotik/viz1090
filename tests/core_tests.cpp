@@ -1,10 +1,12 @@
 #include "AircraftList.h"
 #include "Map.h"
+#include "OrganicMapsFeed.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
 static int failures = 0;
@@ -204,12 +206,36 @@ static void testMapQuadtreeDegenerateLine() {
                map.root.se != NULL);
 }
 
+static void testOrganicMapsFeedGeoJson() {
+    AppData appData;
+    Aircraft *aircraft = new Aircraft(0xABC123);
+    aircraft->lon = -73.845139f;
+    aircraft->lat = 40.723972f;
+    std::memcpy(aircraft->flight, "TEST\"1", 6);
+    aircraft->altitude = 12000;
+    aircraft->speed = 250;
+    aircraft->track = 85;
+    aircraft->vert_rate = -64;
+    aircraft->seen = 12345;
+    appData.aircraftList.head = aircraft;
+
+    OrganicMapsFeed feed;
+    std::string json = feed.buildGeoJson(&appData);
+
+    CHECK_TRUE(json.find("\"type\":\"FeatureCollection\"") != std::string::npos);
+    CHECK_TRUE(json.find("\"icao\":\"ABC123\"") != std::string::npos);
+    CHECK_TRUE(json.find("\"flight\":\"TEST\\\"1\"") != std::string::npos);
+    CHECK_TRUE(json.find("\"coordinates\":[-73.84514,40.72397]") != std::string::npos);
+    CHECK_TRUE(json.find("\"vertical_rate\":-64") != std::string::npos);
+}
+
 int main() {
     testAircraftHistory();
     testAircraftListUpdateAndRemoval();
     testModeSCallsignFixture();
     testModeSPositionFixture();
     testMapQuadtreeDegenerateLine();
+    testOrganicMapsFeedGeoJson();
 
     if(failures) {
         std::fprintf(stderr, "%d core test failure(s)\n", failures);

@@ -32,6 +32,7 @@
 #include "AppData.h"
 #include "View.h"
 #include "Input.h"
+#include "OrganicMapsFeed.h"
 #include <cerrno>
 #include <climits>
 #include <cstdio>
@@ -59,6 +60,8 @@ void showHelp(void) {
 "--label-scale <factor>           Aircraft label scaling (default: 1.0)\n"
 "--lon <longitude>                Longitude in degrees\n"
 "--metric                         Use metric units\n"
+"--organic-feed <path>            Write aircraft GeoJSON for an Organic Maps sidecar overlay\n"
+"--organic-feed-interval-ms <ms>  Aircraft GeoJSON write interval, 100-60000 (default: 1000)\n"
 "--plane-scale <factor>           Aircraft icon scaling (default: 1.0)\n"
 "--port <port>                    TCP Beast output listen port (default: 30005)\n"
 "--server <IPv4/hosname>          TCP Beast output listen IPv4 (default: 127.0.0.1)\n"
@@ -120,6 +123,7 @@ int main(int argc, char **argv) {
   
     AppData appData;
     View view(&appData);
+    OrganicMapsFeed organicMapsFeed;
     bool debugInput = false;
     
     // Parse the command line options
@@ -199,6 +203,17 @@ int main(int argc, char **argv) {
             view.currentLon = view.centerLon;
         } else if (!strcmp(argv[j],"--metric")) {
             view.metric = 1;
+        } else if (!strcmp(argv[j],"--organic-feed")) {
+            requireArgs(argc, j, 1, argv[j]);
+            organicMapsFeed.setPath(argv[++j]);
+        } else if (!strcmp(argv[j],"--organic-feed-interval-ms")) {
+            requireArgs(argc, j, 1, argv[j]);
+            int intervalMs = 0;
+            if(!parseIntArg(argv[++j], &intervalMs) || !organicMapsFeed.setIntervalMs(intervalMs)) {
+                fprintf(stderr, "Invalid Organic Maps feed interval '%s'. Expected 100 to 60000 ms.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--plane-scale")) {
             requireArgs(argc, j, 1, argv[j]);
             if(!parseFloatArg(argv[++j], &view.plane_scale) || view.plane_scale < 0.5f || view.plane_scale > 4.0f) {
@@ -295,6 +310,7 @@ int main(int argc, char **argv) {
         view.draw();
         appData.connect();
         appData.update();
+        organicMapsFeed.update(&appData);
     }
     
     appData.disconnect();

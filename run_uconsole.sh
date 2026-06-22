@@ -12,6 +12,8 @@ MAP_PROFILE="us-hd"
 BBOX="-180,17,-52,72"
 MAP_DIR="mapdata/generated/us-hd"
 WEATHER_FILE="weather/radar_tiles.csv"
+ORGANIC_FEED=""
+ORGANIC_FEED_INTERVAL_MS="1000"
 THEME="atc"
 UISCALE="1"
 PLANE_SCALE="1.5"
@@ -55,6 +57,8 @@ Options:
   --bbox <bounds>     Map bbox lon_min,lat_min,lon_max,lat_max. Default: US profile.
   --mapdir <path>     Generated map directory. Default: mapdata/generated/us-hd
   --weather-file <path> Radar tile cache file. Default: weather/radar_tiles.csv
+  --organic-feed <path> Write aircraft GeoJSON for an Organic Maps sidecar overlay.
+  --organic-feed-interval-ms <ms> Feed interval. Default: 1000
   --theme <name>      classic, atc, map, or light. Default: atc
   --osm-mode          Use a local OSM-style raster basemap when available.
                       Default tile source: mapdata/tiles/us.mbtiles
@@ -221,6 +225,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --weather-file)
             WEATHER_FILE="$2"
+            shift 2
+            ;;
+        --organic-feed)
+            ORGANIC_FEED="$2"
+            shift 2
+            ;;
+        --organic-feed-interval-ms)
+            ORGANIC_FEED_INTERVAL_MS="$2"
             shift 2
             ;;
         --theme)
@@ -425,6 +437,14 @@ if [[ -n "${TILE_SOURCE}" && -e "${TILE_SOURCE}" ]]; then
         --tile-min-zoom "${TILE_MIN_ZOOM}"
         --tile-max-zoom "${TILE_MAX_ZOOM}"
         --tile-zoom-offset "${TILE_ZOOM_OFFSET}"
+    )
+fi
+
+if [[ -n "${ORGANIC_FEED}" ]]; then
+    mkdir -p "$(dirname "${ORGANIC_FEED}")"
+    viz_args+=(
+        --organic-feed "${ORGANIC_FEED}"
+        --organic-feed-interval-ms "${ORGANIC_FEED_INTERVAL_MS}"
     )
 fi
 

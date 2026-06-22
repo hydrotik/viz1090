@@ -29,6 +29,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#ifndef AIRCRAFT_H
+#define AIRCRAFT_H
+
 #include <stdint.h>
 
 #include <ctime>
@@ -92,3 +95,5 @@ public:
     Aircraft(uint32_t addr);  
     ~Aircraft();
 };
+
+#endif

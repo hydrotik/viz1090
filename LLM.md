@@ -154,6 +154,18 @@ Raster/OSM-style basemap path:
 - Do not bulk scrape `tile.openstreetmap.org` into MBTiles. OSM's tile policy prohibits bulk downloading and offline use of those hosted raster tiles. Use self-hosted/generated tiles or a provider that explicitly allows offline packaging.
 - Organic Maps is a useful product/design reference for offline OSM maps, but this repo should not embed Organic Maps directly. Its app engine is much larger than needed for viz1090, and its binary `.mwm` map files carry a separate license/attribution path. Keep the integration boundary at standard tile packages unless the project intentionally pivots to a full navigation stack.
 
+Organic Maps integration path:
+
+- The project is now pursuing Organic Maps as the high-fidelity offline map/navigation engine for the car-friendly view.
+- Keep Organic Maps in `external/organicmaps`, ignored by git, using `tools/bootstrap_organicmaps.sh`.
+- Do not vendor Organic Maps source into this repo.
+- Run viz1090/dump1090 as the aviation data producer and Organic Maps as the primary map renderer.
+- viz1090 supports `--organic-feed <path>` and `--organic-feed-interval-ms <ms>` to write compact aircraft GeoJSON for an Organic Maps overlay patch.
+- Prefer `/run/user/$(id -u)/viz1090-aircraft.geojson` on the uConsole so the feed is tmpfs-backed and avoids SD-card churn.
+- The Organic Maps patch should poll by mtime every 500-1000 ms, parse only the GeoJSON properties emitted by `OrganicMapsFeed`, and draw lightweight aircraft symbols in a custom overlay layer.
+- Keep SDR, Beast decoding, weather capture, and ADS-B classification out of Organic Maps. Those remain in viz1090/dump1090-side tooling.
+- Organic Maps binary data files require visible Organic Maps and OpenStreetMap attribution if used in a distributed app.
+
 Aircraft labels include heuristic category markers:
 
 - Green dot: likely commercial based on common airline callsign prefixes/patterns.

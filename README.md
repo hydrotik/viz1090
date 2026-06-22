@@ -163,6 +163,15 @@ mkdir -p mapdata/tiles
 
 Do not bulk-download tiles from `tile.openstreetmap.org` for offline use. Use self-hosted/generated tiles or a provider that explicitly permits offline MBTiles or tile packaging.
 
+For the Organic Maps path, use Organic Maps as the primary offline map/navigation engine and run viz1090 as the ADS-B feed producer:
+
+```
+tools/bootstrap_organicmaps.sh
+./run_uconsole.sh --organic-feed /run/user/$(id -u)/viz1090-aircraft.geojson
+```
+
+The feed is compact GeoJSON and is written atomically for a future Organic Maps overlay layer. See [ORGANIC_MAPS.md](ORGANIC_MAPS.md).
+
 If you previously generated only the smaller NYC or Northeast map, force the new high-detail US map once:
 
 ```
@@ -303,6 +312,8 @@ viz1090 will open an SDL window set to the resolution of your screen.
 | --lat                         | Specify your latitude in degrees | 
 | --lon                         | Specify your longitude in degrees | 
 | --mapdir [path]               | Directory containing generated map files. New maps may include styled layer files `admin.bin`, `coast.bin`, `water.bin`, and `roads.bin`; legacy `mapdata.bin` is still supported. |
+| --organic-feed [path]         | Write compact aircraft GeoJSON for an Organic Maps sidecar overlay |
+| --organic-feed-interval-ms [ms] | Organic Maps feed write interval, 100-60000 ms. Default: 1000 |
 | --label-scale [factor]        | Scale aircraft labels independently from the rest of the UI |
 | --plane-scale [factor]        | Scale aircraft icons independently from the rest of the UI |
 | --screensize [width] [height]	| Specify a resolution, otherwise use resolution of display | 

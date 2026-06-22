@@ -28,6 +28,8 @@ mapnames
 mapdata/cache/
 mapdata/work/
 weather/
+mapdata/tiles/
+external/
 
 viz1090
 tests/core_tests

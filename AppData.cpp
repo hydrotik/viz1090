@@ -167,8 +167,6 @@ void AppData::updateStatus() {
      msgRate                = msgRateAccumulate;
      avgSig                 = totalCount ? sigAccumulate / (double) totalCount : 0.0;
      numPlanes              = totalCount;
-     numVisiblePlanes       = numVisiblePlanes;
-     maxDist                = maxDist;
 }
 
 
