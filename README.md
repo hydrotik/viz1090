@@ -109,6 +109,14 @@ On a ClockworkPi uConsole, the wrapper script builds if needed, generates this U
 ./run_uconsole.sh
 ```
 
+For the normal uConsole field workflow, use the station launcher instead. It builds the app, refreshes internet radar once, starts a background radar updater, launches the offline raster map/ADS-B UI, and stops the updater when the UI exits:
+
+```
+./run_uconsole_station.sh --tiles mapdata/tiles/nyc-raster.mbtiles
+```
+
+Use `--debug-weather` only while troubleshooting. Normal use should leave it off. If the weather layer is hard to see on the uConsole screen, the station launcher defaults to larger high-contrast radar cells; tune with `--weather-min-pixels`.
+
 When syncing source code to the uConsole with `rsync --delete`, exclude local map data so offline caches and generated maps are not removed from the device:
 
 ```
@@ -334,6 +342,12 @@ For a sharper NYC-area radar overlay, use a smaller bbox with higher network zoo
 ```
 
 Zoom 9 can add detail, but it increases network requests and CSV size. Start with zoom 8/cell-pixels 3 on the uConsole and only increase if rendering stays smooth.
+
+The one-command equivalent for normal NYC/offline-raster use is:
+
+```
+./run_uconsole_station.sh --tiles mapdata/tiles/nyc-raster.mbtiles
+```
 
 To diagnose the uConsole GPS path while the device sits near a window:
 

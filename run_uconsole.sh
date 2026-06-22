@@ -19,7 +19,7 @@ UISCALE="1"
 PLANE_SCALE="1.5"
 LABEL_SCALE="1.9"
 STATUS_SCALE="1.8"
-WEATHER_MIN_PIXELS="2"
+WEATHER_MIN_PIXELS="6"
 TILE_SOURCE=""
 TILE_MODE="auto"
 TILE_THEME="auto"
@@ -76,7 +76,7 @@ Options:
   --plane-scale <n>   Aircraft icon scale. Default: 1.5
   --label-scale <n>   Aircraft label scale. Default: 1.9
   --status-scale <n>  Bottom status text scale. Default: 1.8
-  --weather-min-pixels <n> Minimum rendered radar cell size. Default: 2
+  --weather-min-pixels <n> Minimum rendered radar cell size. Default: 6
   --simulate-weather  Draw a simulated radar storm cell.
   --debug-input       Print SDL input events to stdout.
   --debug-weather     Print radar cache load/render diagnostics.

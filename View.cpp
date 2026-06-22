@@ -1206,18 +1206,18 @@ void View::drawGeography() {
 
 static SDL_Color weatherColorForIntensity(int intensity) {
     if(intensity >= 4) {
-        return {198, 42, 198, 190};
+        return {255, 40, 255, 240};
     }
 
     if(intensity == 3) {
-        return {220, 55, 42, 175};
+        return {255, 50, 35, 235};
     }
 
     if(intensity == 2) {
-        return {230, 205, 38, 155};
+        return {255, 220, 0, 230};
     }
 
-    return {0, 180, 90, 130};
+    return {35, 255, 85, 220};
 }
 
 void View::loadWeatherTiles() {
@@ -1348,6 +1348,12 @@ void View::updateSimulatedWeatherTiles() {
 
 void View::drawWeatherTiles() {
     int visibleTiles = 0;
+    int visibleIntensityCounts[5] = {0, 0, 0, 0, 0};
+    int visibleLeft = screen_width;
+    int visibleTop = screen_height;
+    int visibleRight = 0;
+    int visibleBottom = 0;
+
     for(std::vector<WeatherTile>::iterator tile = weather_tiles.begin(); tile != weather_tiles.end(); ++tile) {
         float dx, dy;
         int x1, y1, x2, y2, x3, y3, x4, y4;
@@ -1384,16 +1390,29 @@ void View::drawWeatherTiles() {
         SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(renderer, &tileRect);
         visibleTiles++;
+        visibleIntensityCounts[tile->intensity]++;
+        visibleLeft = std::min(visibleLeft, std::max(0, tileRect.x));
+        visibleTop = std::min(visibleTop, std::max(0, tileRect.y));
+        visibleRight = std::max(visibleRight, std::min(screen_width, tileRect.x + tileRect.w));
+        visibleBottom = std::max(visibleBottom, std::min(screen_height, tileRect.y + tileRect.h));
     }
 
     if(debug_weather && elapsed_s(lastWeatherDebugPrint) >= 5.0f) {
         printf(
-            "weather: visible %d/%zu tiles center %.4f,%.4f zoom %.2f\n",
+            "weather: visible %d/%zu tiles center %.4f,%.4f zoom %.2f intensities 1=%d 2=%d 3=%d 4=%d screen %d,%d to %d,%d\n",
             visibleTiles,
             weather_tiles.size(),
             centerLon,
             centerLat,
-            currentMaxDist
+            currentMaxDist,
+            visibleIntensityCounts[1],
+            visibleIntensityCounts[2],
+            visibleIntensityCounts[3],
+            visibleIntensityCounts[4],
+            visibleLeft,
+            visibleTop,
+            visibleRight,
+            visibleBottom
         );
         fflush(stdout);
         lastWeatherDebugPrint = now();
@@ -1848,7 +1867,7 @@ View::View(AppData *appData){
     status_scale            = 1.0f;
     simulate_weather        = false;
     debug_weather           = false;
-    weather_min_pixels      = 2;
+    weather_min_pixels      = 6;
     weather_file            = "";
     raster_tile_source      = "";
     raster_tile_mode        = "auto";

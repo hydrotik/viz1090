@@ -80,7 +80,7 @@ void showHelp(void) {
 "--tile-zoom-offset <n>           Adjust chosen raster tile zoom (default: 0)\n"
 "--uiscale <factor>               UI global scaling (default: 1)\n"  
 "--weather-file <path>            Radar tile cache file to render\n"
-"--weather-min-pixels <n>         Minimum rendered radar cell size (default: 2)\n"
+"--weather-min-pixels <n>         Minimum rendered radar cell size (default: 6)\n"
     );
 }
 
