@@ -7,9 +7,9 @@ TILES="mapdata/tiles/nyc-raster.mbtiles"
 MAP_PROFILE="us-hd"
 WEATHER_BBOX="-75,39.8,-71.8,42.2"
 NETWORK_ZOOM="8"
-NETWORK_CELL_PIXELS="6"
-NETWORK_MIN_COVERAGE="0.05"
-WEATHER_MIN_PIXELS="8"
+NETWORK_CELL_PIXELS="3"
+NETWORK_MIN_COVERAGE="0.08"
+WEATHER_MIN_PIXELS="3"
 WEATHER=1
 RF_WEATHER=0
 GPS=1
@@ -37,9 +37,9 @@ Options:
   --gps / --no-gps            Let run_uconsole.sh try GPS. Default: --gps
   --weather-bbox <bbox>       lon_min,lat_min,lon_max,lat_max. Default: NYC metro
   --network-zoom <z>          RainViewer fetch zoom. Default: 8
-  --network-cell-pixels <n>   Radar output cell size. Default: 6
-  --network-min-coverage <n>  Minimum precip coverage per cell. Default: 0.05
-  --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 8
+  --network-cell-pixels <n>   Radar output cell size. Default: 3
+  --network-min-coverage <n>  Minimum precip coverage per cell. Default: 0.08
+  --weather-min-pixels <n>    Minimum rendered radar cell size. Default: 3
   --rf-weather                Try RF UAT/FIS-B before network fallback.
   --no-weather                Start app without the weather updater.
   --debug-weather             Print radar load/render diagnostics.

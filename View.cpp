@@ -1492,17 +1492,6 @@ void View::drawWeatherTiles() {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         boxRGBA(
             renderer,
-            clippedRect.x - 2,
-            clippedRect.y - 2,
-            clippedRect.x + clippedRect.w + 1,
-            clippedRect.y + clippedRect.h + 1,
-            0,
-            0,
-            0,
-            180
-        );
-        boxRGBA(
-            renderer,
             clippedRect.x,
             clippedRect.y,
             clippedRect.x + clippedRect.w - 1,
@@ -1510,7 +1499,7 @@ void View::drawWeatherTiles() {
             color.r,
             color.g,
             color.b,
-            255
+            color.a
         );
         visibleTiles++;
         visibleIntensityCounts[tile->intensity]++;
@@ -1520,7 +1509,7 @@ void View::drawWeatherTiles() {
         visibleBottom = std::max(visibleBottom, clippedRect.y + clippedRect.h);
     }
 
-    if(visibleTiles > 0) {
+    if(debug_weather && visibleTiles > 0) {
         rectangleRGBA(renderer, visibleLeft, visibleTop, visibleRight, visibleBottom, 255, 255, 255, 220);
         rectangleRGBA(renderer, visibleLeft - 1, visibleTop - 1, visibleRight + 1, visibleBottom + 1, 0, 0, 0, 220);
         thickLineRGBA(renderer, visibleLeft, visibleTop, visibleRight, visibleTop, 2, 255, 255, 255, 220);
@@ -2020,7 +2009,7 @@ View::View(AppData *appData){
     fit_weather             = false;
     weather_fit_done        = false;
     weather_fit_redraw_pending = false;
-    weather_min_pixels      = 6;
+    weather_min_pixels      = 3;
     weather_file            = "";
     raster_tile_source      = "";
     raster_tile_mode        = "auto";
