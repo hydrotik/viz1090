@@ -1,0 +1,475 @@
+diff --git a/qt/CMakeLists.txt b/qt/CMakeLists.txt
+index e578604..746b10b 100644
+--- a/qt/CMakeLists.txt
++++ b/qt/CMakeLists.txt
+@@ -5,6 +5,8 @@ QT6_ADD_RESOURCES(RES_SOURCES res/resources.qrc)
+ set(SRC
+   about.cpp
+   about.hpp
++  aircraft_overlay.cpp
++  aircraft_overlay.hpp
+   bookmark_dialog.cpp
+   bookmark_dialog.hpp
+   build_style/build_common.cpp
+diff --git a/qt/aircraft_overlay.cpp b/qt/aircraft_overlay.cpp
+new file mode 100644
+index 0000000..df00fec
+--- /dev/null
++++ b/qt/aircraft_overlay.cpp
+@@ -0,0 +1,208 @@
++#include "qt/aircraft_overlay.hpp"
++
++#include "geometry/mercator.hpp"
++
++#include <QtCore/QFile>
++#include <QtCore/QFileInfo>
++#include <QtCore/QJsonArray>
++#include <QtCore/QJsonDocument>
++#include <QtCore/QJsonObject>
++#include <QtGui/QBrush>
++#include <QtGui/QColor>
++#include <QtGui/QFont>
++#include <QtGui/QPainter>
++#include <QtGui/QPainterPath>
++#include <QtGui/QPen>
++
++#include <cmath>
++
++namespace qt
++{
++namespace
++{
++double DegToRad(double degrees)
++{
++  static double constexpr kPi = 3.14159265358979323846;
++  return degrees * kPi / 180.0;
++}
++
++QString LabelFor(AircraftOverlay::Aircraft const & aircraft)
++{
++  QString label = aircraft.m_flight.trimmed();
++  if (label.isEmpty())
++    label = aircraft.m_icao;
++
++  if (aircraft.m_altitude > 0)
++    label += QString(" %1").arg(aircraft.m_altitude);
++  if (aircraft.m_speed > 0)
++    label += QString(" %1kt").arg(aircraft.m_speed);
++
++  return label;
++}
++
++bool ReadNumber(QJsonObject const & object, char const * key, double & value)
++{
++  auto const jsonValue = object.value(QLatin1String(key));
++  if (!jsonValue.isDouble())
++    return false;
++  value = jsonValue.toDouble();
++  return true;
++}
++
++int ReadInt(QJsonObject const & object, char const * key)
++{
++  auto const jsonValue = object.value(QLatin1String(key));
++  return jsonValue.isDouble() ? jsonValue.toInt() : 0;
++}
++
++QString ReadString(QJsonObject const & object, char const * key)
++{
++  auto const jsonValue = object.value(QLatin1String(key));
++  return jsonValue.isString() ? jsonValue.toString() : QString();
++}
++}  // namespace
++
++void AircraftOverlay::SetFeedPath(QString const & path)
++{
++  if (m_feedPath == path)
++    return;
++
++  m_feedPath = path;
++  m_lastModified = QDateTime();
++  m_lastSize = -1;
++  m_aircraft.clear();
++}
++
++void AircraftOverlay::ReloadIfChanged()
++{
++  if (m_feedPath.isEmpty())
++    return;
++
++  QFileInfo const info(m_feedPath);
++  if (!info.exists() || !info.isFile())
++  {
++    if (!m_aircraft.empty())
++      m_aircraft.clear();
++    m_lastModified = QDateTime();
++    m_lastSize = -1;
++    return;
++  }
++
++  if (info.lastModified() == m_lastModified && info.size() == m_lastSize)
++    return;
++
++  m_lastModified = info.lastModified();
++  m_lastSize = info.size();
++  Reload();
++}
++
++void AircraftOverlay::Reload()
++{
++  QFile file(m_feedPath);
++  if (!file.open(QIODevice::ReadOnly))
++    return;
++
++  QJsonParseError error;
++  QJsonDocument const document = QJsonDocument::fromJson(file.readAll(), &error);
++  if (error.error != QJsonParseError::NoError || !document.isObject())
++    return;
++
++  QJsonArray const features = document.object().value(QLatin1String("features")).toArray();
++  std::vector<Aircraft> aircraft;
++  aircraft.reserve(static_cast<size_t>(features.size()));
++
++  for (auto const & featureValue : features)
++  {
++    QJsonObject const feature = featureValue.toObject();
++    QJsonObject const geometry = feature.value(QLatin1String("geometry")).toObject();
++    if (geometry.value(QLatin1String("type")).toString() != QLatin1String("Point"))
++      continue;
++
++    QJsonArray const coordinates = geometry.value(QLatin1String("coordinates")).toArray();
++    if (coordinates.size() < 2 || !coordinates[0].isDouble() || !coordinates[1].isDouble())
++      continue;
++
++    Aircraft item;
++    item.m_lon = coordinates[0].toDouble();
++    item.m_lat = coordinates[1].toDouble();
++    if (!mercator::ValidLat(item.m_lat) || !mercator::ValidLon(item.m_lon))
++      continue;
++
++    QJsonObject const properties = feature.value(QLatin1String("properties")).toObject();
++    item.m_icao = ReadString(properties, "icao");
++    item.m_flight = ReadString(properties, "flight");
++    item.m_altitude = ReadInt(properties, "altitude");
++    item.m_speed = ReadInt(properties, "speed");
++    (void)ReadNumber(properties, "track", item.m_track);
++
++    aircraft.push_back(std::move(item));
++  }
++
++  m_aircraft = std::move(aircraft);
++}
++
++void AircraftOverlay::Draw(QPainter & painter, QRect const & viewport, ScreenBase const & screen, double devicePixelRatio,
++                           int drawScale) const
++{
++  if (m_aircraft.empty() || devicePixelRatio <= 0.0)
++    return;
++
++  painter.save();
++  painter.setRenderHint(QPainter::Antialiasing, true);
++
++  QPen markerPen(QColor(0, 25, 30, 220));
++  markerPen.setWidthF(1.4);
++  painter.setPen(markerPen);
++  painter.setBrush(QColor(0, 230, 255, 230));
++
++  QFont labelFont = painter.font();
++  labelFont.setPointSize(drawScale >= 11 ? 12 : 10);
++  labelFont.setBold(true);
++  painter.setFont(labelFont);
++
++  QPen labelPen(QColor(235, 255, 255, 245));
++  QBrush labelBackground(QColor(0, 20, 24, 180));
++  bool const drawLabels = drawScale >= 10;
++
++  for (auto const & aircraft : m_aircraft)
++  {
++    m2::PointD const mercatorPoint = mercator::FromLatLon(aircraft.m_lat, aircraft.m_lon);
++    m2::PointD const devicePoint = screen.GtoP(mercatorPoint);
++    QPointF const point(devicePoint.x / devicePixelRatio, devicePoint.y / devicePixelRatio);
++    if (!viewport.adjusted(-32, -32, 32, 32).contains(point.toPoint()))
++      continue;
++
++    double const angle = DegToRad(aircraft.m_track);
++    QPointF const nose(std::sin(angle) * 10.0, -std::cos(angle) * 10.0);
++    QPointF const left(std::sin(angle + 2.45) * 7.0, -std::cos(angle + 2.45) * 7.0);
++    QPointF const right(std::sin(angle - 2.45) * 7.0, -std::cos(angle - 2.45) * 7.0);
++
++    QPainterPath marker;
++    marker.moveTo(point + nose);
++    marker.lineTo(point + left);
++    marker.lineTo(point + right);
++    marker.closeSubpath();
++    painter.drawPath(marker);
++
++    if (!drawLabels)
++      continue;
++
++    QString const label = LabelFor(aircraft);
++    if (label.isEmpty())
++      continue;
++
++    QRectF const labelRect = painter.fontMetrics().boundingRect(label).adjusted(-5, -3, 5, 3);
++    QRectF const placedLabel(point.x() + 12, point.y() - labelRect.height() - 2, labelRect.width(), labelRect.height());
++    painter.setPen(Qt::NoPen);
++    painter.setBrush(labelBackground);
++    painter.drawRoundedRect(placedLabel, 4, 4);
++    painter.setPen(labelPen);
++    painter.drawText(placedLabel.adjusted(5, 2, -5, -2), Qt::AlignLeft | Qt::AlignVCenter, label);
++    painter.setPen(markerPen);
++    painter.setBrush(QColor(0, 230, 255, 230));
++  }
++
++  painter.restore();
++}
++
++}  // namespace qt
+diff --git a/qt/aircraft_overlay.hpp b/qt/aircraft_overlay.hpp
+new file mode 100644
+index 0000000..e861233
+--- /dev/null
++++ b/qt/aircraft_overlay.hpp
+@@ -0,0 +1,47 @@
++#pragma once
++
++#include "geometry/screenbase.hpp"
++
++#include <QtCore/QDateTime>
++#include <QtCore/QString>
++
++#include <vector>
++
++class QPainter;
++class QRect;
++
++namespace qt
++{
++
++class AircraftOverlay
++{
++public:
++  struct Aircraft
++  {
++    double m_lat = 0.0;
++    double m_lon = 0.0;
++    double m_track = 0.0;
++    int m_altitude = 0;
++    int m_speed = 0;
++    QString m_icao;
++    QString m_flight;
++  };
++
++  void SetFeedPath(QString const & path);
++  bool IsEnabled() const { return !m_feedPath.isEmpty(); }
++  size_t GetAircraftCount() const { return m_aircraft.size(); }
++
++  void ReloadIfChanged();
++  void Draw(QPainter & painter, QRect const & viewport, ScreenBase const & screen, double devicePixelRatio,
++            int drawScale) const;
++
++private:
++  void Reload();
++
++  QString m_feedPath;
++  QDateTime m_lastModified;
++  qint64 m_lastSize = -1;
++  std::vector<Aircraft> m_aircraft;
++};
++
++}  // namespace qt
+diff --git a/qt/draw_widget.cpp b/qt/draw_widget.cpp
+index 44d7931..224f55a 100644
+--- a/qt/draw_widget.cpp
++++ b/qt/draw_widget.cpp
+@@ -34,6 +34,7 @@
+ #include <QtCore/QTimer>
+ #include <QtGui/QGuiApplication>
+ #include <QtGui/QMouseEvent>
++#include <QtGui/QPainter>
+ #include <QtWidgets/QApplication>
+ #include <QtWidgets/QDialog>
+ #include <QtWidgets/QDialogButtonBox>
+@@ -91,12 +92,14 @@ df::TouchEvent::ETouchType qtTouchEventTypeToDfTouchEventType(QEvent::Type qEven
+ #endif
+ }  // namespace
+ 
+-DrawWidget::DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QWidget * parent)
++DrawWidget::DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams,
++                       QString const & aircraftFeedPath, QWidget * parent)
+   : TBase(framework, screenshotParams != nullptr, parent)
+   , m_rubberBand(nullptr)
+   , m_emulatingLocation(false)
+ {
+   setFocusPolicy(Qt::StrongFocus);
++  m_aircraftOverlay.SetFeedPath(aircraftFeedPath);
+ 
+   m_framework.SetPlacePageListeners([this]() { ShowPlacePage(); }, {} /* onClose */, {} /* onUpdate */,
+                                     {} /*onSwitchFullScreen */);
+@@ -192,6 +195,19 @@ void DrawWidget::initializeGL()
+     m_screenshoter->Start();
+ }
+ 
++void DrawWidget::paintGL()
++{
++  TBase::paintGL();
++
++  if (!m_aircraftOverlay.IsEnabled() || !HasCurrentScreen())
++    return;
++
++  m_aircraftOverlay.ReloadIfChanged();
++
++  QPainter painter(this);
++  m_aircraftOverlay.Draw(painter, rect(), GetCurrentScreen(), m_ratio, m_framework.GetDrawScale());
++}
++
+ bool DrawWidget::event(QEvent * event)
+ {
+ #if !defined(OMIM_OS_LINUX)
+diff --git a/qt/draw_widget.hpp b/qt/draw_widget.hpp
+index c1d826f..41668a5 100644
+--- a/qt/draw_widget.hpp
++++ b/qt/draw_widget.hpp
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include "qt/aircraft_overlay.hpp"
+ #include "qt/qt_common/map_widget.hpp"
+ #include "qt/routing_turns_visualizer.hpp"
+ #include "qt/ruler.hpp"
+@@ -43,7 +44,8 @@ public Q_SLOTS:
+   void ChoosePositionModeDisable();
+ 
+ public:
+-  DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QWidget * parent);
++  DrawWidget(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QString const & aircraftFeedPath,
++             QWidget * parent);
+   ~DrawWidget() override;
+ 
+   std::string GetDistance(search::Result const & res) const;
+@@ -97,6 +99,8 @@ protected:
+   void mouseReleaseEvent(QMouseEvent * e) override;
+   //@}
+ 
++  void paintGL() override;
++
+   void keyPressEvent(QKeyEvent * e) override;
+   void keyReleaseEvent(QKeyEvent * e) override;
+ 
+@@ -138,5 +142,6 @@ private:
+   std::unique_ptr<Screenshoter> m_screenshoter;
+   Ruler m_ruler;
+   RoutingTurnsVisualizer m_turnsVisualizer;
++  AircraftOverlay m_aircraftOverlay;
+ };
+ }  // namespace qt
+diff --git a/qt/main.cpp b/qt/main.cpp
+index ccdc69a..c1de826 100644
+--- a/qt/main.cpp
++++ b/qt/main.cpp
+@@ -50,6 +50,7 @@ DEFINE_int32(height, 0, "Screenshot height.");
+ DEFINE_double(
+     dpi_scale, 0.0,
+     "Screenshot dpi scale (mdpi = 1.0, hdpi = 1.5, xhdpiScale = 2.0, 6plus = 2.4, xxhdpi = 3.0, xxxhdpi = 3.5).");
++DEFINE_string(viz1090_aircraft_feed, "", "Path to a viz1090 aircraft GeoJSON feed to render as a map overlay.");
+ 
+ namespace
+ {
+@@ -241,7 +242,8 @@ int main(int argc, char * argv[])
+         qt::common::ApplySystemNightMode(framework);
+     };
+     syncNightMode();
+-    qt::MainWindow w(framework, std::move(screenshotParams), QApplication::primaryScreen()->geometry()
++    qt::MainWindow w(framework, std::move(screenshotParams), QApplication::primaryScreen()->geometry(),
++                     QString::fromStdString(FLAGS_viz1090_aircraft_feed)
+ #ifdef BUILD_DESIGNER
+                                                                  ,
+                      mapcssFilePath
+diff --git a/qt/mainwindow.cpp b/qt/mainwindow.cpp
+index 7492252..02a40bf 100644
+--- a/qt/mainwindow.cpp
++++ b/qt/mainwindow.cpp
+@@ -99,7 +99,7 @@ T * CreateBlackControl(QString const & name)
+ extern char const * kOauthTokenSetting;
+ 
+ MainWindow::MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams,
+-                       QRect const & screenGeometry
++                       QRect const & screenGeometry, QString const & aircraftFeedPath
+ #ifdef BUILD_DESIGNER
+                        ,
+                        QString const & mapcssFilePath
+@@ -125,7 +125,7 @@ MainWindow::MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams>
+ 
+   int const width = m_screenshotMode ? static_cast<int>(screenshotParams->m_width) : 0;
+   int const height = m_screenshotMode ? static_cast<int>(screenshotParams->m_height) : 0;
+-  m_pDrawWidget = new DrawWidget(framework, std::move(screenshotParams), this);
++  m_pDrawWidget = new DrawWidget(framework, std::move(screenshotParams), aircraftFeedPath, this);
+ 
+   setCentralWidget(m_pDrawWidget);
+ 
+diff --git a/qt/mainwindow.hpp b/qt/mainwindow.hpp
+index 2c25996..f6edf1b 100644
+--- a/qt/mainwindow.hpp
++++ b/qt/mainwindow.hpp
+@@ -8,6 +8,7 @@
+ #include "platform/location.hpp"
+ #include "platform/location_service/location_service.hpp"
+ 
++#include <QtCore/QString>
+ #include <QtWidgets/QApplication>
+ #include <QtWidgets/QMainWindow>
+ 
+@@ -94,7 +95,8 @@ private:
+   Q_OBJECT
+ 
+ public:
+-  MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QRect const & screenGeometry
++  MainWindow(Framework & framework, std::unique_ptr<ScreenshotParams> && screenshotParams, QRect const & screenGeometry,
++             QString const & aircraftFeedPath
+ #ifdef BUILD_DESIGNER
+              ,
+              QString const & mapcssFilePath = QString()
+diff --git a/qt/qt_common/map_widget.cpp b/qt/qt_common/map_widget.cpp
+index 7414b89..abf997e 100644
+--- a/qt/qt_common/map_widget.cpp
++++ b/qt/qt_common/map_widget.cpp
+@@ -258,6 +258,8 @@ df::Touch MapWidget::GetSymmetrical(df::Touch const & touch) const
+ 
+ void MapWidget::OnViewportChanged(ScreenBase const & screen)
+ {
++  m_currentScreen = screen;
++  m_hasCurrentScreen = true;
+   UpdateScaleControl();
+ }
+ 
+diff --git a/qt/qt_common/map_widget.hpp b/qt/qt_common/map_widget.hpp
+index 3e806f7..cac1f10 100644
+--- a/qt/qt_common/map_widget.hpp
++++ b/qt/qt_common/map_widget.hpp
+@@ -4,6 +4,8 @@
+ #include "drape_frontend/gui/skin.hpp"
+ #include "drape_frontend/user_event_stream.hpp"
+ 
++#include "geometry/screenbase.hpp"
++
+ #include "qt/qt_common/qtoglcontextfactory.hpp"
+ 
+ #include <QOpenGLWidget>
+@@ -82,6 +84,8 @@ protected:
+   void ShowInfoPopup(QMouseEvent * e, m2::PointD const & pt);
+ 
+   void OnViewportChanged(ScreenBase const & screen);
++  bool HasCurrentScreen() const { return m_hasCurrentScreen; }
++  ScreenBase const & GetCurrentScreen() const { return m_currentScreen; }
+ 
+   // QOpenGLWidget overrides:
+   void initializeGL() override;
+@@ -104,6 +108,8 @@ protected:
+   std::unique_ptr<gui::Skin> m_skin;
+ 
+   std::unique_ptr<QTimer> m_updateTimer;
++  ScreenBase m_currentScreen;
++  bool m_hasCurrentScreen = false;
+ 
+   std::unique_ptr<QOpenGLShaderProgram> m_program;
+   std::unique_ptr<QOpenGLVertexArrayObject> m_vao;

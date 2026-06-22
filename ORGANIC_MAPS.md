@@ -35,6 +35,7 @@ Organic Maps is large. Build it on the Mac or a Linux workstation first, then de
 On an Apple Silicon Mac, build the native desktop app with:
 
 ```sh
+tools/apply_organicmaps_overlay.sh
 tools/build_organicmaps_macos.sh
 ```
 
@@ -45,6 +46,35 @@ external/omim-build-arm64/omim-build-release/OMaps.app
 ```
 
 If a previous Rosetta/Intel build exists in `external/omim-build-release`, leave it as a fallback; do not mix that build directory with the native arm64 build.
+
+The overlay patch is tracked in this repository as:
+
+```sh
+tools/organicmaps_viz1090_aircraft_overlay.patch
+```
+
+It adds the Organic Maps desktop flag:
+
+```sh
+--viz1090_aircraft_feed <path>
+```
+
+Run the patched Mac app against a local copy of the uConsole feed with:
+
+```sh
+external/omim-build-arm64/omim-build-release/OMaps.app/Contents/MacOS/OMaps \
+  --viz1090_aircraft_feed /tmp/viz1090-aircraft.geojson
+```
+
+For a quick live Mac-side check while the feed is produced on the uConsole, copy it over SSH in a loop:
+
+```sh
+while true; do
+  scp djdonovan@192.168.1.195:/run/user/1000/viz1090-aircraft.geojson /tmp/viz1090-aircraft.geojson.tmp &&
+    mv /tmp/viz1090-aircraft.geojson.tmp /tmp/viz1090-aircraft.geojson
+  sleep 1
+done
+```
 
 ## ADS-B Overlay Feed
 
@@ -96,13 +126,13 @@ The feed shape is a GeoJSON `FeatureCollection` of point features:
 
 ## Organic Maps Patch Target
 
-The first Organic Maps patch should be narrow:
+The current Organic Maps patch is intentionally narrow:
 
-1. Add a runtime setting or CLI flag for an external aircraft GeoJSON path.
-2. Poll the file every 500-1000 ms, using file mtime to skip unchanged reads.
-3. Parse only the fields above.
-4. Draw aircraft as a lightweight custom overlay layer using existing map projection APIs.
-5. Keep labels optional and zoom-gated for uConsole performance.
+1. Adds `--viz1090_aircraft_feed`.
+2. Polls the file by mtime/size from the Qt draw path.
+3. Parses only the GeoJSON fields emitted by viz1090.
+4. Draws aircraft markers above the desktop Organic Maps map using the current viewport projection.
+5. Shows compact labels only when the map is zoomed in enough.
 
 Do not add SDR, dump1090, or Beast decoding code to Organic Maps. Keep RF and aviation protocol handling in viz1090/dump1090.
 
@@ -117,7 +147,7 @@ Do not add SDR, dump1090, or Beast decoding code to Organic Maps. Keep RF and av
 
 ## Near-Term Work
 
-- Identify the lightest overlay insertion point in Organic Maps.
-- Add a proof-of-concept layer reading `viz1090-aircraft.geojson`.
-- Validate runtime on uConsole before adding labels, trails, or weather.
+- Validate the patched desktop overlay visually with a live copied uConsole feed.
+- Decide whether to run patched Organic Maps on the uConsole or keep it as the Mac/high-fidelity view.
+- If uConsole runtime is acceptable, build/test the patched Organic Maps checkout on Linux/aarch64.
 - Only after aircraft overlay is stable, consider moving weather radar into the same Organic Maps overlay path.

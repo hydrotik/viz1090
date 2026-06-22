@@ -158,12 +158,13 @@ Organic Maps integration path:
 
 - The project is now pursuing Organic Maps as the high-fidelity offline map/navigation engine for the car-friendly view.
 - Keep Organic Maps in `external/organicmaps`, ignored by git, using `tools/bootstrap_organicmaps.sh`.
+- Apply the tracked aircraft overlay patch with `tools/apply_organicmaps_overlay.sh`. The patch file is `tools/organicmaps_viz1090_aircraft_overlay.patch`.
 - On Apple Silicon Macs, build the native desktop app with `tools/build_organicmaps_macos.sh`; it uses `/opt/homebrew` Qt/CMake/Ninja and writes `external/omim-build-arm64/omim-build-release/OMaps.app`. Keep any older Rosetta/Intel build in `external/omim-build-release` separate as a fallback.
 - Do not vendor Organic Maps source into this repo.
 - Run viz1090/dump1090 as the aviation data producer and Organic Maps as the primary map renderer.
 - viz1090 supports `--organic-feed <path>` and `--organic-feed-interval-ms <ms>` to write compact aircraft GeoJSON for an Organic Maps overlay patch.
 - Prefer `/run/user/$(id -u)/viz1090-aircraft.geojson` on the uConsole so the feed is tmpfs-backed and avoids SD-card churn.
-- The Organic Maps patch should poll by mtime every 500-1000 ms, parse only the GeoJSON properties emitted by `OrganicMapsFeed`, and draw lightweight aircraft symbols in a custom overlay layer.
+- The Organic Maps desktop patch adds `--viz1090_aircraft_feed <path>`, polls by mtime/size, parses only the GeoJSON properties emitted by `OrganicMapsFeed`, and draws lightweight aircraft symbols/zoom-gated labels above the map.
 - Keep SDR, Beast decoding, weather capture, and ADS-B classification out of Organic Maps. Those remain in viz1090/dump1090-side tooling.
 - Organic Maps binary data files require visible Organic Maps and OpenStreetMap attribution if used in a distributed app.
 
