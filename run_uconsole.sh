@@ -471,7 +471,7 @@ fi
 
 if [[ "${SIMULATE_WEATHER}" -eq 1 ]]; then
     viz_args+=(--simulate-weather)
-elif [[ -s "${WEATHER_FILE}" ]]; then
+elif [[ -n "${WEATHER_FILE}" ]]; then
     viz_args+=(--weather-file "${WEATHER_FILE}")
 fi
 
