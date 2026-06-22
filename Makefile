@@ -11,12 +11,22 @@ PKG_CONFIG ?= pkg-config
 
 SDL_CFLAGS := $(shell $(PKG_CONFIG) --cflags sdl2 SDL2_ttf SDL2_gfx 2>/dev/null)
 SDL_LIBS := $(shell $(PKG_CONFIG) --libs sdl2 SDL2_ttf SDL2_gfx 2>/dev/null)
+SDL_IMAGE_CFLAGS := $(shell $(PKG_CONFIG) --cflags SDL2_image 2>/dev/null)
+SDL_IMAGE_LIBS := $(shell $(PKG_CONFIG) --libs SDL2_image 2>/dev/null)
+SQLITE_CFLAGS := $(shell $(PKG_CONFIG) --cflags sqlite3 2>/dev/null)
+SQLITE_LIBS := $(shell $(PKG_CONFIG) --libs sqlite3 2>/dev/null)
 ifeq ($(strip $(SDL_LIBS)),)
 SDL_LIBS = -lSDL2 -lSDL2_ttf -lSDL2_gfx
 endif
+ifneq ($(strip $(SDL_IMAGE_LIBS)),)
+OPTIONAL_CPPFLAGS += -DHAVE_SDL2_IMAGE
+endif
+ifneq ($(strip $(SQLITE_LIBS)),)
+OPTIONAL_CPPFLAGS += -DHAVE_SQLITE3
+endif
 
-CPPFLAGS += -I. $(SDL_CFLAGS)
-LIBS= -lm $(SDL_LIBS) -lpthread -g
+CPPFLAGS += -I. $(SDL_CFLAGS) $(SDL_IMAGE_CFLAGS) $(SQLITE_CFLAGS) $(OPTIONAL_CPPFLAGS)
+LIBS= -lm $(SDL_LIBS) $(SDL_IMAGE_LIBS) $(SQLITE_LIBS) -lpthread -g
 
 all: viz1090
 

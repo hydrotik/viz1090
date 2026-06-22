@@ -82,6 +82,13 @@ sudo apt install python3 python3-fiona python3-tqdm python3-shapely python3-nump
 
 This will produce files for map and airport geometry, with labels, that viz1090 reads. If any of these files don't exist then visualizer will show planes and trails without any geography.
 
+Optional raster basemap support uses SDL2_image and SQLite:
+
+```
+sudo apt install libsdl2-image-dev libsqlite3-dev
+make clean && make viz1090
+```
+
 The default parameters for mapconverter should render reasonably quickly on a Raspberry Pi 4. See the mapconverter section below for other options and more information about map sources.
 
 For portable/offline use, run the download once, then reuse the cached sources:
@@ -138,6 +145,23 @@ For a larger, more readable in-car view, use car mode. It selects the `drive` ma
 ```
 ./run_uconsole.sh --car-mode
 ```
+
+For a true street-map style base layer, use a local offline raster tile source. viz1090 supports MBTiles files and z/x/y tile directories when built with `SDL2_image`; MBTiles also needs `sqlite3`:
+
+```
+sudo apt install -y libsdl2-image-dev libsqlite3-dev
+make clean && make viz1090
+mkdir -p mapdata/tiles
+./run_uconsole.sh --osm-mode --tiles mapdata/tiles/us.mbtiles
+```
+
+`--osm-mode` uses the map theme and overlays aircraft, weather, runways, labels, and controls over the raster basemap. It does not download map tiles. Put a legally generated or provider-licensed offline MBTiles file at `mapdata/tiles/us.mbtiles`, or pass a z/x/y tile directory:
+
+```
+./run_uconsole.sh --tiles mapdata/tiles/nyc --tiles-mode xyz --tile-max-zoom 16
+```
+
+Do not bulk-download tiles from `tile.openstreetmap.org` for offline use. Use self-hosted/generated tiles or a provider that explicitly permits offline MBTiles or tile packaging.
 
 If you previously generated only the smaller NYC or Northeast map, force the new high-detail US map once:
 
@@ -285,6 +309,11 @@ viz1090 will open an SDL window set to the resolution of your screen.
 | --simulate-weather            | Draw a simulated moving radar tile grid for UI validation |
 | --theme [classic/atc/map/light] | Select the color theme. `classic` is the original look, `atc` is high-contrast radar style, `map` is a muted vector-map style, and `light` is a daylight map style |
 | --status-scale [factor]       | Scale the bottom status strip independently from the rest of the UI |
+| --tiles [path]                | Render an offline raster basemap under the vector/weather/aircraft overlays. Supports MBTiles files or z/x/y tile directories when optional tile dependencies are installed. |
+| --tiles-mode [auto/mbtiles/xyz/tms] | Select raster tile source type. `auto` treats `.mbtiles` paths as MBTiles and other paths as xyz directories. |
+| --tile-min-zoom [z]           | Minimum raster tile zoom. Default: 0 |
+| --tile-max-zoom [z]           | Maximum raster tile zoom. Default: 17 |
+| --tile-zoom-offset [n]        | Offset the automatically selected raster tile zoom, useful when a basemap looks too soft or too detailed. |
 | --uiscale [scale]				| Scale up UI elements by integer amounts for high resolution screen | 
 | --weather-file [path]         | Render a radar tile cache file with `lat_min,lon_min,lat_max,lon_max,intensity` rows |
 | --fullscreen					| Render fullscreen rather than in a window | 

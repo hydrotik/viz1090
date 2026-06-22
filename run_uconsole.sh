@@ -17,6 +17,11 @@ UISCALE="1"
 PLANE_SCALE="1.5"
 LABEL_SCALE="1.9"
 STATUS_SCALE="1.8"
+TILE_SOURCE=""
+TILE_MODE="auto"
+TILE_MIN_ZOOM="0"
+TILE_MAX_ZOOM="17"
+TILE_ZOOM_OFFSET="0"
 TOLERANCE="0.001"
 MINPOP="100000"
 ROADS=1
@@ -51,6 +56,13 @@ Options:
   --mapdir <path>     Generated map directory. Default: mapdata/generated/us-hd
   --weather-file <path> Radar tile cache file. Default: weather/radar_tiles.csv
   --theme <name>      classic, atc, map, or light. Default: atc
+  --osm-mode          Use a local OSM-style raster basemap when available.
+                      Default tile source: mapdata/tiles/us.mbtiles
+  --tiles <path>      Offline raster tiles: MBTiles file or z/x/y tile directory.
+  --tiles-mode <mode> auto, mbtiles, xyz, or tms. Default: auto
+  --tile-min-zoom <z> Minimum raster tile zoom. Default: 0
+  --tile-max-zoom <z> Maximum raster tile zoom. Default: 17
+  --tile-zoom-offset <n> Adjust selected raster tile zoom. Default: 0
   --uiscale <value>   UI scale. Default: 1
   --plane-scale <n>   Aircraft icon scale. Default: 1.5
   --label-scale <n>   Aircraft label scale. Default: 1.9
@@ -137,6 +149,17 @@ apply_car_mode() {
     GPS_TIMEOUT="20"
 }
 
+apply_osm_mode() {
+    THEME="map"
+    if [[ -z "${TILE_SOURCE}" ]]; then
+        TILE_SOURCE="mapdata/tiles/us.mbtiles"
+    fi
+    TILE_MODE="auto"
+    TILE_MIN_ZOOM="0"
+    TILE_MAX_ZOOM="16"
+    TILE_ZOOM_OFFSET="0"
+}
+
 apply_map_profile
 
 while [[ $# -gt 0 ]]; do
@@ -202,6 +225,30 @@ while [[ $# -gt 0 ]]; do
             ;;
         --theme)
             THEME="$2"
+            shift 2
+            ;;
+        --osm-mode)
+            apply_osm_mode
+            shift
+            ;;
+        --tiles)
+            TILE_SOURCE="$2"
+            shift 2
+            ;;
+        --tiles-mode)
+            TILE_MODE="$2"
+            shift 2
+            ;;
+        --tile-min-zoom)
+            TILE_MIN_ZOOM="$2"
+            shift 2
+            ;;
+        --tile-max-zoom)
+            TILE_MAX_ZOOM="$2"
+            shift 2
+            ;;
+        --tile-zoom-offset)
+            TILE_ZOOM_OFFSET="$2"
             shift 2
             ;;
         --uiscale)
@@ -354,6 +401,10 @@ PY
     ./getmap.sh "${map_args[@]}"
 fi
 
+if [[ -n "${TILE_SOURCE}" && ! -e "${TILE_SOURCE}" ]]; then
+    echo "Raster tile source ${TILE_SOURCE} was requested but does not exist yet; continuing with vector map only." >&2
+fi
+
 viz_args=(
     --fullscreen
     --screensize 1280 720
@@ -366,6 +417,16 @@ viz_args=(
     --lat "${LAT}"
     --lon "${LON}"
 )
+
+if [[ -n "${TILE_SOURCE}" && -e "${TILE_SOURCE}" ]]; then
+    viz_args+=(
+        --tiles "${TILE_SOURCE}"
+        --tiles-mode "${TILE_MODE}"
+        --tile-min-zoom "${TILE_MIN_ZOOM}"
+        --tile-max-zoom "${TILE_MAX_ZOOM}"
+        --tile-zoom-offset "${TILE_ZOOM_OFFSET}"
+    )
+fi
 
 if [[ "${SIMULATE_WEATHER}" -eq 1 ]]; then
     viz_args+=(--simulate-weather)

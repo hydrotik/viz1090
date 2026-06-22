@@ -41,6 +41,10 @@
 #include <string>
 #include <vector>
 
+#ifdef HAVE_SQLITE3
+struct sqlite3;
+#endif
+
 
 //defs - should all move to config file setup
 #define ROUND_RADIUS 3 //radius of text box corners
@@ -65,6 +69,13 @@ typedef struct WeatherTile {
     float lon_max;
     int intensity;
 } WeatherTile;
+
+typedef struct RasterTileCacheEntry {
+    std::string key;
+    SDL_Texture *texture;
+    bool missing;
+    int last_used;
+} RasterTileCacheEntry;
 
 class View {
 
@@ -111,6 +122,12 @@ class View {
 		void drawPlaneIcon(int x, int y, float heading, SDL_Color planeColor);
 		void drawTrails(int left, int top, int right, int bottom);
 		void drawScaleBars();
+		void drawRasterTiles();
+		SDL_Texture *loadRasterTile(int z, int x, int y);
+		SDL_Texture *loadRasterTileFromDirectory(int z, int x, int y, const std::string &key, bool *missing);
+		SDL_Texture *loadRasterTileFromMbtiles(int z, int x, int y, const std::string &key, bool *missing);
+		int chooseRasterTileZoom();
+		void clearRasterTileCache();
 		void drawLinesRecursive(QuadTree *tree, float screen_lat_min, float screen_lat_max, float screen_lon_min, float screen_lon_max, SDL_Color color);
 		void drawLines(int left, int top, int right, int bottom, int bailTime);
 		void drawPlaceNames();		
@@ -190,6 +207,18 @@ class View {
 	    std::string weather_file;
 	    std::vector<WeatherTile> weather_tiles;
 	    std::chrono::high_resolution_clock::time_point lastWeatherLoad;
+	    std::string raster_tile_source;
+	    std::string raster_tile_mode;
+	    int raster_tile_min_zoom;
+	    int raster_tile_max_zoom;
+	    int raster_tile_zoom_offset;
+	    int raster_tile_cache_limit;
+	    int raster_tile_clock;
+	    bool raster_tile_warning_shown;
+	    std::vector<RasterTileCacheEntry> raster_tile_cache;
+#ifdef HAVE_SQLITE3
+	    sqlite3 *raster_tile_db;
+#endif
 	    bool light_mode;
 
 		SDL_Window		*window;

@@ -37,11 +37,20 @@
 #include "AircraftLabel.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <thread>
+
+#ifdef HAVE_SDL2_IMAGE
+#include "SDL2/SDL_image.h"
+#endif
+
+#ifdef HAVE_SQLITE3
+#include "sqlite3.h"
+#endif
 
 using fmilliseconds = std::chrono::duration<float, std::milli>;
 using fseconds = std::chrono::duration<float>;
@@ -70,6 +79,34 @@ static float clamp(float in, float min, float max) {
     }
 
     return out;
+}
+
+static bool endsWith(const std::string &value, const std::string &suffix) {
+    if(value.length() < suffix.length()) {
+        return false;
+    }
+
+    return value.compare(value.length() - suffix.length(), suffix.length(), suffix) == 0;
+}
+
+static double webMercatorLatFromTileY(int y, int z) {
+    double n = std::pow(2.0, z);
+    double mercator = M_PI * (1.0 - 2.0 * static_cast<double>(y) / n);
+    return std::atan(std::sinh(mercator)) * 180.0 / M_PI;
+}
+
+static double lonFromTileX(int x, int z) {
+    return static_cast<double>(x) / std::pow(2.0, z) * 360.0 - 180.0;
+}
+
+static int clampInt(int value, int minValue, int maxValue) {
+    if(value < minValue) {
+        return minValue;
+    }
+    if(value > maxValue) {
+        return maxValue;
+    }
+    return value;
 }
 
 
@@ -250,6 +287,10 @@ void View::SDL_init() {
         printf("Couldn't initialize SDL TTF: %s\n", SDL_GetError());
         exit(1);
     }
+
+#ifdef HAVE_SDL2_IMAGE
+    IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
+#endif
 
     SDL_ShowCursor(SDL_DISABLE);
 
@@ -712,6 +753,273 @@ void View::drawLinesRecursive(QuadTree *tree, float screen_lat_min, float screen
    
 }
 
+int View::chooseRasterTileZoom() {
+    float leftLat, leftLon, rightLat, rightLon;
+    latLonFromScreenCoords(&leftLat, &leftLon, 0, screen_height / 2);
+    latLonFromScreenCoords(&rightLat, &rightLon, screen_width, screen_height / 2);
+
+    double lonSpan = std::fabs(static_cast<double>(rightLon) - static_cast<double>(leftLon));
+    if(lonSpan < 0.000001) {
+        lonSpan = 0.000001;
+    }
+
+    double zoom = std::log((360.0 * static_cast<double>(screen_width)) / (256.0 * lonSpan)) / std::log(2.0);
+    int selected = static_cast<int>(std::floor(zoom)) + raster_tile_zoom_offset;
+    return clampInt(selected, raster_tile_min_zoom, raster_tile_max_zoom);
+}
+
+void View::clearRasterTileCache() {
+    for(std::vector<RasterTileCacheEntry>::iterator entry = raster_tile_cache.begin(); entry != raster_tile_cache.end(); ++entry) {
+        if(entry->texture) {
+            SDL_DestroyTexture(entry->texture);
+        }
+    }
+    raster_tile_cache.clear();
+}
+
+SDL_Texture *View::loadRasterTileFromDirectory(int z, int x, int y, const std::string &key, bool *missing) {
+#ifndef HAVE_SDL2_IMAGE
+    (void)z;
+    (void)x;
+    (void)y;
+    (void)key;
+    *missing = true;
+    return NULL;
+#else
+    int yForPath = y;
+    if(raster_tile_mode == "tms") {
+        yForPath = (1 << z) - 1 - y;
+    }
+
+    std::ostringstream base;
+    base << raster_tile_source << "/" << z << "/" << x << "/" << yForPath;
+    const char *extensions[] = {".png", ".jpg", ".jpeg", ".webp"};
+
+    for(unsigned int i = 0; i < sizeof(extensions) / sizeof(extensions[0]); i++) {
+        std::string path = base.str() + extensions[i];
+        std::ifstream test(path.c_str(), std::ios::binary);
+        if(!test.good()) {
+            continue;
+        }
+
+        SDL_Texture *texture = IMG_LoadTexture(renderer, path.c_str());
+        if(texture) {
+            *missing = false;
+            SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+            return texture;
+        }
+    }
+
+    *missing = true;
+    return NULL;
+#endif
+}
+
+SDL_Texture *View::loadRasterTileFromMbtiles(int z, int x, int y, const std::string &key, bool *missing) {
+#if !defined(HAVE_SDL2_IMAGE) || !defined(HAVE_SQLITE3)
+    (void)z;
+    (void)x;
+    (void)y;
+    (void)key;
+    *missing = true;
+    return NULL;
+#else
+    if(raster_tile_db == NULL) {
+        if(sqlite3_open_v2(raster_tile_source.c_str(), &raster_tile_db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+            if(raster_tile_db) {
+                sqlite3_close(raster_tile_db);
+                raster_tile_db = NULL;
+            }
+            *missing = true;
+            return NULL;
+        }
+    }
+
+    sqlite3_stmt *stmt = NULL;
+    const char *sql = "SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ? LIMIT 1";
+    if(sqlite3_prepare_v2(raster_tile_db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        *missing = true;
+        return NULL;
+    }
+
+    int tmsY = (1 << z) - 1 - y;
+    sqlite3_bind_int(stmt, 1, z);
+    sqlite3_bind_int(stmt, 2, x);
+    sqlite3_bind_int(stmt, 3, tmsY);
+
+    SDL_Texture *texture = NULL;
+    if(sqlite3_step(stmt) == SQLITE_ROW) {
+        const void *blob = sqlite3_column_blob(stmt, 0);
+        int blobSize = sqlite3_column_bytes(stmt, 0);
+        if(blob && blobSize > 0) {
+            SDL_RWops *rw = SDL_RWFromConstMem(blob, blobSize);
+            SDL_Surface *surface = rw ? IMG_Load_RW(rw, 1) : NULL;
+            if(surface) {
+                texture = SDL_CreateTextureFromSurface(renderer, surface);
+                SDL_FreeSurface(surface);
+            }
+        }
+    }
+
+    sqlite3_finalize(stmt);
+
+    if(texture) {
+        *missing = false;
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+        return texture;
+    }
+
+    *missing = true;
+    return NULL;
+#endif
+}
+
+SDL_Texture *View::loadRasterTile(int z, int x, int y) {
+    if(raster_tile_source.empty()) {
+        return NULL;
+    }
+
+    int maxTile = (1 << z) - 1;
+    if(y < 0 || y > maxTile) {
+        return NULL;
+    }
+    x = ((x % (maxTile + 1)) + (maxTile + 1)) % (maxTile + 1);
+
+    std::ostringstream keyBuilder;
+    keyBuilder << z << "/" << x << "/" << y;
+    std::string key = keyBuilder.str();
+
+    raster_tile_clock++;
+    for(std::vector<RasterTileCacheEntry>::iterator entry = raster_tile_cache.begin(); entry != raster_tile_cache.end(); ++entry) {
+        if(entry->key == key) {
+            entry->last_used = raster_tile_clock;
+            return entry->missing ? NULL : entry->texture;
+        }
+    }
+
+    bool missing = false;
+    SDL_Texture *texture = NULL;
+    std::string mode = raster_tile_mode;
+    if(mode == "auto") {
+        mode = endsWith(raster_tile_source, ".mbtiles") ? "mbtiles" : "xyz";
+    }
+
+    if(mode == "mbtiles") {
+        texture = loadRasterTileFromMbtiles(z, x, y, key, &missing);
+    } else {
+        texture = loadRasterTileFromDirectory(z, x, y, key, &missing);
+    }
+
+    RasterTileCacheEntry entry;
+    entry.key = key;
+    entry.texture = texture;
+    entry.missing = missing;
+    entry.last_used = raster_tile_clock;
+    raster_tile_cache.push_back(entry);
+
+    while(static_cast<int>(raster_tile_cache.size()) > raster_tile_cache_limit) {
+        std::vector<RasterTileCacheEntry>::iterator oldest = raster_tile_cache.begin();
+        for(std::vector<RasterTileCacheEntry>::iterator current = raster_tile_cache.begin(); current != raster_tile_cache.end(); ++current) {
+            if(current->last_used < oldest->last_used) {
+                oldest = current;
+            }
+        }
+        if(oldest->texture) {
+            SDL_DestroyTexture(oldest->texture);
+        }
+        raster_tile_cache.erase(oldest);
+    }
+
+    return texture;
+}
+
+void View::drawRasterTiles() {
+    if(raster_tile_source.empty()) {
+        return;
+    }
+
+#ifndef HAVE_SDL2_IMAGE
+    if(!raster_tile_warning_shown) {
+        fprintf(stderr, "Raster tiles requested but viz1090 was built without SDL2_image support.\n");
+        raster_tile_warning_shown = true;
+    }
+    return;
+#else
+    std::string mode = raster_tile_mode;
+    if(mode == "auto") {
+        mode = endsWith(raster_tile_source, ".mbtiles") ? "mbtiles" : "xyz";
+    }
+
+#ifndef HAVE_SQLITE3
+    if(mode == "mbtiles") {
+        if(!raster_tile_warning_shown) {
+            fprintf(stderr, "MBTiles requested but viz1090 was built without sqlite3 support.\n");
+            raster_tile_warning_shown = true;
+        }
+        return;
+    }
+#endif
+
+    int z = chooseRasterTileZoom();
+    int tileCount = 1 << z;
+
+    float latTop, lonLeft, latBottom, lonRight;
+    latLonFromScreenCoords(&latTop, &lonLeft, 0, 0);
+    latLonFromScreenCoords(&latBottom, &lonRight, screen_width, screen_height);
+
+    double west = std::min(static_cast<double>(lonLeft), static_cast<double>(lonRight));
+    double east = std::max(static_cast<double>(lonLeft), static_cast<double>(lonRight));
+    double north = std::max(static_cast<double>(latTop), static_cast<double>(latBottom));
+    double south = std::min(static_cast<double>(latTop), static_cast<double>(latBottom));
+
+    north = std::min(85.05112878, std::max(-85.05112878, north));
+    south = std::min(85.05112878, std::max(-85.05112878, south));
+
+    auto lonToTileX = [tileCount](double lon) {
+        return static_cast<int>(std::floor((lon + 180.0) / 360.0 * tileCount));
+    };
+
+    auto latToTileY = [tileCount](double lat) {
+        double latRad = lat * M_PI / 180.0;
+        return static_cast<int>(std::floor((1.0 - std::log(std::tan(latRad) + 1.0 / std::cos(latRad)) / M_PI) / 2.0 * tileCount));
+    };
+
+    int xMin = lonToTileX(west) - 1;
+    int xMax = lonToTileX(east) + 1;
+    int yMin = clampInt(latToTileY(north) - 1, 0, tileCount - 1);
+    int yMax = clampInt(latToTileY(south) + 1, 0, tileCount - 1);
+
+    for(int x = xMin; x <= xMax; x++) {
+        for(int y = yMin; y <= yMax; y++) {
+            SDL_Texture *texture = loadRasterTile(z, x, y);
+            if(!texture) {
+                continue;
+            }
+
+            int normalizedX = ((x % tileCount) + tileCount) % tileCount;
+            double westLon = lonFromTileX(normalizedX, z);
+            double eastLon = lonFromTileX(normalizedX + 1, z);
+            double northLat = webMercatorLatFromTileY(y, z);
+            double southLat = webMercatorLatFromTileY(y + 1, z);
+
+            float dx, dy;
+            int x1, y1, x2, y2;
+            pxFromLonLat(&dx, &dy, static_cast<float>(westLon), static_cast<float>(northLat));
+            screenCoords(&x1, &y1, dx, dy);
+            pxFromLonLat(&dx, &dy, static_cast<float>(eastLon), static_cast<float>(southLat));
+            screenCoords(&x2, &y2, dx, dy);
+
+            SDL_Rect dest;
+            dest.x = std::min(x1, x2);
+            dest.y = std::min(y1, y2);
+            dest.w = std::max(1, std::abs(x2 - x1) + 1);
+            dest.h = std::max(1, std::abs(y2 - y1) + 1);
+            SDL_RenderCopy(renderer, texture, NULL, &dest);
+        }
+    }
+#endif
+}
+
 void View::drawPlaceNames() {
     if(map.loaded < 100) {
         return;
@@ -766,7 +1074,8 @@ void View::drawGeography() {
         SDL_SetRenderDrawColor(renderer, style.backgroundColor.r, style.backgroundColor.g, style.backgroundColor.b, 255);
 
         SDL_RenderClear(renderer);
-        
+
+        drawRasterTiles();
         drawLines(0, 0, screen_width, screen_height, 0);
         drawPlaceNames();
 
@@ -1436,6 +1745,17 @@ View::View(AppData *appData){
     status_scale            = 1.0f;
     simulate_weather        = false;
     weather_file            = "";
+    raster_tile_source      = "";
+    raster_tile_mode        = "auto";
+    raster_tile_min_zoom    = 0;
+    raster_tile_max_zoom    = 17;
+    raster_tile_zoom_offset = 0;
+    raster_tile_cache_limit = 192;
+    raster_tile_clock       = 0;
+    raster_tile_warning_shown = false;
+#ifdef HAVE_SQLITE3
+    raster_tile_db          = NULL;
+#endif
     light_mode              = false;
     metric                  = 0;
     fps                     = 0;
@@ -1474,6 +1794,14 @@ View::View(AppData *appData){
 }
 
 View::~View() {
+    clearRasterTileCache();
+#ifdef HAVE_SQLITE3
+    if(raster_tile_db) {
+        sqlite3_close(raster_tile_db);
+        raster_tile_db = NULL;
+    }
+#endif
+
     closeFont(mapFont);
     closeFont(mapBoldFont);
     closeFont(messageFont);
@@ -1492,6 +1820,10 @@ View::~View() {
     if(window) {
         SDL_DestroyWindow(window);
     }
+
+#ifdef HAVE_SDL2_IMAGE
+    IMG_Quit();
+#endif
 
     TTF_Quit();
     SDL_Quit();

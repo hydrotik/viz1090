@@ -68,6 +68,11 @@ void showHelp(void) {
 "--simulate-weather               Draw a simulated moving radar storm cell\n"
 "--status-scale <factor>          Bottom status text scaling (default: 1.0)\n"
 "--theme <classic|atc|map|light>  Set UI/map color theme (default: classic)\n"
+"--tiles <path>                   Offline raster tiles: MBTiles file or z/x/y tile directory\n"
+"--tiles-mode <auto|mbtiles|xyz|tms> Raster tile source type (default: auto)\n"
+"--tile-min-zoom <z>              Minimum raster tile zoom (default: 0)\n"
+"--tile-max-zoom <z>              Maximum raster tile zoom (default: 17)\n"
+"--tile-zoom-offset <n>           Adjust chosen raster tile zoom (default: 0)\n"
 "--uiscale <factor>               UI global scaling (default: 1)\n"  
 "--weather-file <path>            Radar tile cache file to render\n"
     );
@@ -135,6 +140,41 @@ int main(int argc, char **argv) {
         } else if (!strcmp(argv[j],"--weather-file")) {
             requireArgs(argc, j, 1, argv[j]);
             view.weather_file = argv[++j];
+        } else if (!strcmp(argv[j],"--tiles")) {
+            requireArgs(argc, j, 1, argv[j]);
+            view.raster_tile_source = argv[++j];
+            view.mapRedraw = 1;
+        } else if (!strcmp(argv[j],"--tiles-mode")) {
+            requireArgs(argc, j, 1, argv[j]);
+            const char *mode = argv[++j];
+            if(strcmp(mode, "auto") && strcmp(mode, "mbtiles") && strcmp(mode, "xyz") && strcmp(mode, "tms")) {
+                fprintf(stderr, "Invalid tiles mode '%s'. Expected auto, mbtiles, xyz, or tms.\n\n", mode);
+                showHelp();
+                exit(1);
+            }
+            view.raster_tile_mode = mode;
+            view.mapRedraw = 1;
+        } else if (!strcmp(argv[j],"--tile-min-zoom")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.raster_tile_min_zoom) || view.raster_tile_min_zoom < 0 || view.raster_tile_min_zoom > 22) {
+                fprintf(stderr, "Invalid tile min zoom '%s'. Expected 0 to 22.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--tile-max-zoom")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.raster_tile_max_zoom) || view.raster_tile_max_zoom < 0 || view.raster_tile_max_zoom > 22) {
+                fprintf(stderr, "Invalid tile max zoom '%s'. Expected 0 to 22.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--tile-zoom-offset")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.raster_tile_zoom_offset) || view.raster_tile_zoom_offset < -4 || view.raster_tile_zoom_offset > 4) {
+                fprintf(stderr, "Invalid tile zoom offset '%s'. Expected -4 to 4.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
         } else if (!strcmp(argv[j],"--lat")) {
             requireArgs(argc, j, 1, argv[j]);
             float lat = 0.0f;
@@ -228,6 +268,11 @@ int main(int argc, char **argv) {
         }
     }
 
+    if(view.raster_tile_min_zoom > view.raster_tile_max_zoom) {
+        fprintf(stderr, "Tile min zoom cannot be greater than tile max zoom.\n\n");
+        showHelp();
+        exit(1);
+    }
 
     appData.initialize();
     view.startMapLoad();
