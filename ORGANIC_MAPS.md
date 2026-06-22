@@ -32,6 +32,20 @@ This creates `external/organicmaps`, which is intentionally ignored by git.
 
 Organic Maps is large. Build it on the Mac or a Linux workstation first, then decide whether the uConsole should run the resulting desktop app or a smaller custom fork. The uConsole is not the fastest place to compile Organic Maps.
 
+On an Apple Silicon Mac, build the native desktop app with:
+
+```sh
+tools/build_organicmaps_macos.sh
+```
+
+The helper uses `/opt/homebrew` by default on arm64 and writes the app to:
+
+```sh
+external/omim-build-arm64/omim-build-release/OMaps.app
+```
+
+If a previous Rosetta/Intel build exists in `external/omim-build-release`, leave it as a fallback; do not mix that build directory with the native arm64 build.
+
 ## ADS-B Overlay Feed
 
 viz1090 can now publish a compact aircraft GeoJSON file for an Organic Maps sidecar overlay:
@@ -103,7 +117,6 @@ Do not add SDR, dump1090, or Beast decoding code to Organic Maps. Keep RF and av
 
 ## Near-Term Work
 
-- Build Organic Maps desktop on the Mac or a Linux workstation.
 - Identify the lightest overlay insertion point in Organic Maps.
 - Add a proof-of-concept layer reading `viz1090-aircraft.geojson`.
 - Validate runtime on uConsole before adding labels, trails, or weather.

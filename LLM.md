@@ -158,6 +158,7 @@ Organic Maps integration path:
 
 - The project is now pursuing Organic Maps as the high-fidelity offline map/navigation engine for the car-friendly view.
 - Keep Organic Maps in `external/organicmaps`, ignored by git, using `tools/bootstrap_organicmaps.sh`.
+- On Apple Silicon Macs, build the native desktop app with `tools/build_organicmaps_macos.sh`; it uses `/opt/homebrew` Qt/CMake/Ninja and writes `external/omim-build-arm64/omim-build-release/OMaps.app`. Keep any older Rosetta/Intel build in `external/omim-build-release` separate as a fallback.
 - Do not vendor Organic Maps source into this repo.
 - Run viz1090/dump1090 as the aviation data producer and Organic Maps as the primary map renderer.
 - viz1090 supports `--organic-feed <path>` and `--organic-feed-interval-ms <ms>` to write compact aircraft GeoJSON for an Organic Maps overlay patch.
