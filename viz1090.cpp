@@ -70,6 +70,9 @@ void showHelp(void) {
 "--mapdir <path>                  Directory containing generated map files (default: .)\n"
 "--screensize <width> <height>    Set frame buffer resolution (default: screen resolution)\n"
 "--screenindex <i>                Set the index of the display to use (default: 0)\n"
+"--screenshot-file <path>         Save one renderer screenshot as BMP\n"
+"--screenshot-delay-ms <ms>       Delay before screenshot capture (default: 3000)\n"
+"--screenshot-exit                Exit after saving screenshot\n"
 "--simulate-weather               Draw a simulated moving radar storm cell\n"
 "--status-scale <factor>          Bottom status text scaling (default: 1.0)\n"
 "--theme <classic|atc|map|light>  Set UI/map color theme (default: classic)\n"
@@ -306,6 +309,19 @@ int main(int argc, char **argv) {
                 showHelp();
                 exit(1);
             }
+        } else if (!strcmp(argv[j],"--screenshot-file")) {
+            requireArgs(argc, j, 1, argv[j]);
+            view.screenshot_file = argv[++j];
+            view.screenshot_done = false;
+        } else if (!strcmp(argv[j],"--screenshot-delay-ms")) {
+            requireArgs(argc, j, 1, argv[j]);
+            if(!parseIntArg(argv[++j], &view.screenshot_delay_ms) || view.screenshot_delay_ms < 0 || view.screenshot_delay_ms > 60000) {
+                fprintf(stderr, "Invalid screenshot delay '%s'. Expected 0 to 60000 ms.\n\n", argv[j]);
+                showHelp();
+                exit(1);
+            }
+        } else if (!strcmp(argv[j],"--screenshot-exit")) {
+            view.screenshot_exit = true;
         } else if (!strcmp(argv[j],"--help")) {
             showHelp();
             exit(0);
@@ -344,6 +360,9 @@ int main(int argc, char **argv) {
         appData.connect();
         appData.update();
         organicMapsFeed.update(&appData);
+        if(view.screenshot_exit && view.screenshot_done) {
+            go = 0;
+        }
     }
     
     appData.disconnect();

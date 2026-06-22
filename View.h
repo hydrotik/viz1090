@@ -150,6 +150,7 @@ class View {
 		void moveMapToTarget();
 		void drawMouse();
 		void drawClick();
+		void captureScreenshotIfNeeded();
 		void registerClick(int tapcount, int x, int y);
 		void registerMouseMove(int x, int y);
 		void draw();
@@ -193,6 +194,7 @@ class View {
 	    std::chrono::high_resolution_clock::time_point drawStartTime;
 	    std::chrono::high_resolution_clock::time_point lastRedraw;
 	    std::chrono::high_resolution_clock::time_point weatherStartTime;
+	    std::chrono::high_resolution_clock::time_point screenshotStartTime;
 
 	    Map map;
 
@@ -207,6 +209,10 @@ class View {
 	    float label_scale;
 	    float status_scale;
 	    bool simulate_weather;
+	    bool screenshot_exit;
+	    bool screenshot_done;
+	    int screenshot_delay_ms;
+	    std::string screenshot_file;
 	    bool debug_weather;
 	    bool fit_weather;
 	    bool weather_fit_done;

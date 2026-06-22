@@ -38,6 +38,9 @@ SKIP_MAP=0
 DEBUG_INPUT=0
 DEBUG_WEATHER=0
 FIT_WEATHER=0
+SCREENSHOT_FILE=""
+SCREENSHOT_DELAY_MS="3000"
+SCREENSHOT_EXIT=0
 EXTRA_ARGS=()
 
 usage() {
@@ -84,6 +87,9 @@ Options:
   --debug-input       Print SDL input events to stdout.
   --debug-weather     Print radar cache load/render diagnostics.
   --fit-weather       Center and zoom to the first loaded radar cache.
+  --screenshot-file <path> Save one renderer screenshot as BMP.
+  --screenshot-delay-ms <ms> Delay before screenshot capture. Default: 3000
+  --screenshot-exit   Exit after saving screenshot.
   --tolerance <value> Map simplification tolerance. Default: profile-specific.
   --minpop <value>    Minimum city population label. Default: 100000
   --no-roads          Do not include roads in regenerated map data.
@@ -318,6 +324,18 @@ while [[ $# -gt 0 ]]; do
             FIT_WEATHER=1
             shift
             ;;
+        --screenshot-file)
+            SCREENSHOT_FILE="$2"
+            shift 2
+            ;;
+        --screenshot-delay-ms)
+            SCREENSHOT_DELAY_MS="$2"
+            shift 2
+            ;;
+        --screenshot-exit)
+            SCREENSHOT_EXIT=1
+            shift
+            ;;
         --tolerance)
             MAP_PROFILE="custom"
             TOLERANCE="$2"
@@ -509,6 +527,12 @@ if [[ "${DEBUG_WEATHER}" -eq 1 ]]; then
 fi
 if [[ "${FIT_WEATHER}" -eq 1 ]]; then
     viz_args+=(--fit-weather)
+fi
+if [[ -n "${SCREENSHOT_FILE}" ]]; then
+    viz_args+=(--screenshot-file "${SCREENSHOT_FILE}" --screenshot-delay-ms "${SCREENSHOT_DELAY_MS}")
+fi
+if [[ "${SCREENSHOT_EXIT}" -eq 1 ]]; then
+    viz_args+=(--screenshot-exit)
 fi
 
 exec ./viz1090 "${viz_args[@]}" "${EXTRA_ARGS[@]}"

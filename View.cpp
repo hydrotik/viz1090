@@ -1871,6 +1871,45 @@ void View::drawClick() {
     } 
 }
 
+void View::captureScreenshotIfNeeded() {
+    if(screenshot_file.empty() || screenshot_done) {
+        return;
+    }
+
+    if(screenshotStartTime.time_since_epoch().count() == 0) {
+        screenshotStartTime = now();
+        return;
+    }
+
+    if(elapsed(screenshotStartTime) < screenshot_delay_ms) {
+        return;
+    }
+
+    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, screen_width, screen_height, 32, SDL_PIXELFORMAT_ARGB8888);
+    if(!surface) {
+        fprintf(stderr, "screenshot: failed to allocate surface: %s\n", SDL_GetError());
+        screenshot_done = true;
+        return;
+    }
+
+    if(SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, surface->pixels, surface->pitch) != 0) {
+        fprintf(stderr, "screenshot: failed to read renderer pixels: %s\n", SDL_GetError());
+        SDL_FreeSurface(surface);
+        screenshot_done = true;
+        return;
+    }
+
+    if(SDL_SaveBMP(surface, screenshot_file.c_str()) != 0) {
+        fprintf(stderr, "screenshot: failed to save %s: %s\n", screenshot_file.c_str(), SDL_GetError());
+    } else {
+        printf("screenshot: saved %s\n", screenshot_file.c_str());
+        fflush(stdout);
+    }
+
+    SDL_FreeSurface(surface);
+    screenshot_done = true;
+}
+
 void View::registerClick(int tapcount, int x, int y) {
     if(tapcount == 1) {
         Aircraft *p = appData->aircraftList.head;
@@ -1958,6 +1997,7 @@ void View::draw() {
     drawStatus();
     //drawMouse();
     drawClick();
+    captureScreenshotIfNeeded();
 
     SDL_RenderPresent(renderer);  
     
@@ -2007,6 +2047,10 @@ View::View(AppData *appData){
     label_scale             = 1.0f;
     status_scale            = 1.0f;
     simulate_weather        = false;
+    screenshot_exit         = false;
+    screenshot_done         = false;
+    screenshot_delay_ms     = 3000;
+    screenshot_file         = "";
     debug_weather           = false;
     fit_weather             = false;
     weather_fit_done        = false;
@@ -2048,6 +2092,7 @@ View::View(AppData *appData){
     weatherStartTime = now();
     lastWeatherLoad = std::chrono::high_resolution_clock::time_point();
     lastWeatherDebugPrint = std::chrono::high_resolution_clock::time_point();
+    screenshotStartTime = std::chrono::high_resolution_clock::time_point();
 
     centerLon   = 0;
     centerLat   = 0;

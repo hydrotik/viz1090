@@ -19,6 +19,9 @@ GPS=1
 DEBUG_WEATHER=0
 FIT_WEATHER=0
 REGEN_MAP=0
+SCREENSHOT_FILE=""
+SCREENSHOT_DELAY_MS="3000"
+SCREENSHOT_EXIT=0
 APP_EXTRA=()
 
 usage() {
@@ -50,6 +53,9 @@ Options:
   --no-weather                Start app without the weather updater.
   --debug-weather             Print radar load/render diagnostics.
   --fit-weather               Center and zoom to the first loaded radar cache.
+  --screenshot-file <path>    Save one renderer screenshot as BMP.
+  --screenshot-delay-ms <ms>  Delay before screenshot capture. Default: 3000
+  --screenshot-exit           Exit after saving screenshot.
   --regen-map                 Regenerate generated map data.
   --help                      Show this help.
 EOF
@@ -128,6 +134,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --fit-weather)
             FIT_WEATHER=1
+            shift
+            ;;
+        --screenshot-file)
+            SCREENSHOT_FILE="$2"
+            shift 2
+            ;;
+        --screenshot-delay-ms)
+            SCREENSHOT_DELAY_MS="$2"
+            shift 2
+            ;;
+        --screenshot-exit)
+            SCREENSHOT_EXIT=1
             shift
             ;;
         --regen-map)
@@ -213,6 +231,13 @@ if [[ "${FIT_WEATHER}" -eq 1 ]]; then
 fi
 if [[ "${REGEN_MAP}" -eq 1 ]]; then
     app_args+=(--regen-map)
+fi
+if [[ -n "${SCREENSHOT_FILE}" ]]; then
+    mkdir -p "$(dirname "${SCREENSHOT_FILE}")"
+    app_args+=(--screenshot-file "${SCREENSHOT_FILE}" --screenshot-delay-ms "${SCREENSHOT_DELAY_MS}")
+fi
+if [[ "${SCREENSHOT_EXIT}" -eq 1 ]]; then
+    app_args+=(--screenshot-exit)
 fi
 
 ./run_uconsole.sh "${app_args[@]}" "${APP_EXTRA[@]}"
