@@ -241,7 +241,7 @@ To sync code and selected raster packs to the uConsole:
 ./deploy_uconsole.sh --tiles conus-regions
 ```
 
-`starter` syncs the national overview, Northeast, and NYC packs when present. `conus-regions` syncs the lower-48 overview and the six regional packs. Missing packs are skipped, so it is safe to run before every region has been generated.
+`starter` syncs the national overview, Northeast, and NYC packs when present. `conus-regions` syncs the lower-48 overview and the six regional packs. `travel-hd` syncs the z14 West Coast, z14 Mountain West, z14 Arizona, and z15 NY/NJ/CT tri-state packs when present. Missing packs are skipped, so it is safe to run before every region has been generated.
 
 For a sharper NYC-first test pack:
 

@@ -33,6 +33,28 @@ class CoverageProfilesTests(unittest.TestCase):
 
         self.assertEqual(bbox, coverage_profiles.MAP_PROFILES["northeast"]["bbox"])
 
+    def test_select_map_prefers_arizona_hd_over_broad_western_region(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tiles_dir = Path(tmp)
+            (tiles_dir / "mountain-west-hd-raster.mbtiles").write_bytes(b"regional")
+            (tiles_dir / "arizona-hd-raster.mbtiles").write_bytes(b"arizona")
+
+            name, path = coverage_profiles.select_map_profile(33.4484, -112.0740, tiles_dir)
+
+            self.assertEqual(name, "arizona-hd")
+            self.assertEqual(path.name, "arizona-hd-raster.mbtiles")
+
+    def test_select_map_prefers_tri_state_ultra_over_nyc(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tiles_dir = Path(tmp)
+            (tiles_dir / "nyc-raster.mbtiles").write_bytes(b"nyc")
+            (tiles_dir / "tri-state-ultra-raster.mbtiles").write_bytes(b"tri-state")
+
+            name, path = coverage_profiles.select_map_profile(40.723972, -73.845139, tiles_dir)
+
+            self.assertEqual(name, "tri-state-ultra")
+            self.assertEqual(path.name, "tri-state-ultra-raster.mbtiles")
+
     def test_local_weather_bbox_is_centered_near_location(self):
         bbox = coverage_profiles.local_weather_bbox(40.0, -75.0)
 

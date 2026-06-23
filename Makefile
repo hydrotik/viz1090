@@ -64,6 +64,7 @@ test-tiles:
 	python3 -m unittest tests.test_inspect_mbtiles
 	python3 -m unittest tests.test_build_raster_mbtiles
 	python3 -m unittest tests.test_build_flock_overlay
+	python3 -m unittest tests.test_coverage_profiles
 
 test-fixtures:
 	python3 tools/replay_benchmark.py --check-fixture

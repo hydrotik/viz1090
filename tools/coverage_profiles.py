@@ -61,6 +61,38 @@ MAP_PROFILES = {
         "output": "mapdata/tiles/west-coast-raster.mbtiles",
         "priority": 70,
     },
+    "west-coast-hd": {
+        "label": "West Coast high detail",
+        "bbox": (-125.0, 31.0, -113.0, 49.0),
+        "min_zoom": 0,
+        "max_zoom": 14,
+        "output": "mapdata/tiles/west-coast-hd-raster.mbtiles",
+        "priority": 115,
+    },
+    "mountain-west-hd": {
+        "label": "Mountain West high detail",
+        "bbox": (-116.0, 31.0, -102.0, 49.0),
+        "min_zoom": 0,
+        "max_zoom": 14,
+        "output": "mapdata/tiles/mountain-west-hd-raster.mbtiles",
+        "priority": 115,
+    },
+    "arizona-hd": {
+        "label": "Arizona high detail",
+        "bbox": (-115.2, 31.0, -108.7, 37.2),
+        "min_zoom": 0,
+        "max_zoom": 14,
+        "output": "mapdata/tiles/arizona-hd-raster.mbtiles",
+        "priority": 130,
+    },
+    "tri-state-ultra": {
+        "label": "NY/NJ/CT tri-state ultra detail",
+        "bbox": (-75.6, 39.3, -71.5, 42.4),
+        "min_zoom": 0,
+        "max_zoom": 15,
+        "output": "mapdata/tiles/tri-state-ultra-raster.mbtiles",
+        "priority": 140,
+    },
     "alaska": {
         "label": "Alaska",
         "bbox": (-170.0, 51.0, -129.0, 72.0),
@@ -158,6 +190,10 @@ def profile_names_for_group(group):
             "mountain-west",
             "west-coast",
         ]
+    if group == "western-hd":
+        return ["west-coast-hd", "mountain-west-hd", "arizona-hd"]
+    if group == "travel-hd":
+        return ["west-coast-hd", "mountain-west-hd", "arizona-hd", "tri-state-ultra"]
     return [group]
 
 
