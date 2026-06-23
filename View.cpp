@@ -1248,6 +1248,14 @@ void View::drawFlockOverlay() {
                 }
 
                 SDL_Color color = flockColorForKind(point->kind);
+                if(detailFactor < 0.25f) {
+                    int dotRadius = point->kind >= 2 ? 4 : 3;
+                    filledCircleRGBA(renderer, screenX, screenY, dotRadius, color.r, color.g, color.b, color.a);
+                    pixelRGBA(renderer, screenX, screenY, 255, 255, 255, 200);
+                    drawn++;
+                    continue;
+                }
+
                 int radius = coreRadius + (point->kind >= 2 ? 1 : 0);
                 int ringOne = ringBase + static_cast<int>(roundf(pulse * (8.0f + 8.0f * detailFactor)));
                 int ringTwo = ringBase + static_cast<int>(roundf(fmodf(pulse + 0.5f, 1.0f) * (8.0f + 8.0f * detailFactor)));

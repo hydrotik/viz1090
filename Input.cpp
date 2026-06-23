@@ -83,11 +83,11 @@ static void panSouth(View *view) {
 }
 
 static void panWest(View *view) {
-    pan(view, -0.12f * view->screen_width, 0);
+    pan(view, 0.12f * view->screen_width, 0);
 }
 
 static void panEast(View *view) {
-    pan(view, 0.12f * view->screen_width, 0);
+    pan(view, -0.12f * view->screen_width, 0);
 }
 
 static void recenter(View *view, AppData *appData) {
@@ -465,5 +465,4 @@ Input::Input(AppData *appData, View *view) {
         }
     }
 }
-
 
