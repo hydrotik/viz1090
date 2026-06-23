@@ -402,7 +402,7 @@ rsync -av --delete mapdata/flock/ \
 ./run_uconsole_station.sh --map-tile-profile auto --weather-profile regional
 ```
 
-`run_uconsole_station.sh` auto-enables the overlay when `mapdata/flock` exists. The renderer loads only visible z6 CSV tiles and caps drawing with `--flock-max-points` for uConsole performance. The default source is `FoggedLens/deflockhopper_maps` `public/cameras-us.json.gz`, which is a compact nationwide ALPR/camera export. `--source ringmast4r` can also convert `Ringmast4r/FLOCK` z6 GeoJSON tiles. This project uses the data as an informational map overlay only; it does not implement camera-avoidance routing.
+`run_uconsole_station.sh` auto-enables the overlay when `mapdata/flock` exists. The renderer loads only visible z6 CSV tiles and caps drawing with `--flock-max-points` for uConsole performance. The default source is `FoggedLens/deflockhopper_maps` `public/cameras-us.json.gz`, which is a compact nationwide ALPR/camera export. `--source ringmast4r` can also convert `Ringmast4r/FLOCK` z6 GeoJSON tiles. When upstream records include direction fields such as `direction` or `camera:direction`, regenerated overlay CSVs include a heading column and viz1090 draws a directional wedge. This project uses the data as an informational map overlay only; it does not implement camera-avoidance routing.
 
 Weather profiles:
 

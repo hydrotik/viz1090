@@ -29,6 +29,32 @@ def classify_feature(properties):
     return 0
 
 
+def normalize_heading(value):
+    try:
+        heading = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    return heading % 360.0
+
+
+def heading_from_properties(properties):
+    for key in (
+        "direction",
+        "directionCardinal",
+        "camera:direction",
+        "camera_direction",
+        "bearing",
+        "heading",
+        "angle",
+    ):
+        if key in properties:
+            heading = normalize_heading(properties.get(key))
+            if heading is not None:
+                return heading
+    return None
+
+
 def feature_points(payload):
     for feature in payload.get("features", []):
         geometry = feature.get("geometry") or {}
@@ -43,7 +69,7 @@ def feature_points(payload):
         except (TypeError, ValueError):
             continue
         properties = feature.get("properties") or {}
-        yield lat, lon, classify_feature(properties)
+        yield lat, lon, classify_feature(properties), heading_from_properties(properties)
 
 
 def deflockhopper_points(payload):
@@ -57,11 +83,11 @@ def deflockhopper_points(payload):
             lon = float(item.get("lon"))
         except (TypeError, ValueError):
             continue
-        yield lat, lon, classify_feature(item)
+        yield lat, lon, classify_feature(item), heading_from_properties(item)
 
 
 def point_in_bbox(point, bbox):
-    lat, lon, _kind = point
+    lat, lon = point[0], point[1]
     lon_min, lat_min, lon_max, lat_max = bbox
     return lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
 
@@ -71,7 +97,7 @@ def group_points_by_tile(points, bbox, zoom):
     for point in points:
         if not point_in_bbox(point, bbox):
             continue
-        lat, lon, _kind = point
+        lat, lon = point[0], point[1]
         x, y = tile_xy_for_lon_lat(lon, lat, zoom)
         grouped.setdefault((x, y), []).append(point)
     return grouped
@@ -107,9 +133,14 @@ def write_csv_tile(path, points):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(path.suffix + ".tmp")
     with temp.open("w", encoding="utf-8") as handle:
-        handle.write("# lat,lon,kind  kind: 0=surveillance, 1=ALPR, 2=Flock Safety\n")
-        for lat, lon, kind in points:
-            handle.write("%.7f,%.7f,%d\n" % (lat, lon, kind))
+        handle.write("# lat,lon,kind,heading  kind: 0=surveillance, 1=ALPR, 2=Flock Safety; heading degrees true north clockwise when known\n")
+        for point in points:
+            lat, lon, kind = point[0], point[1], point[2]
+            heading = point[3] if len(point) > 3 else None
+            if heading is None:
+                handle.write("%.7f,%.7f,%d\n" % (lat, lon, kind))
+            else:
+                handle.write("%.7f,%.7f,%d,%.1f\n" % (lat, lon, kind, heading))
     temp.replace(path)
 
 

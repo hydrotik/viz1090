@@ -11,7 +11,7 @@ class BuildFlockOverlayTests(unittest.TestCase):
             "features": [
                 {
                     "geometry": {"type": "Point", "coordinates": [-73.1, 40.2]},
-                    "properties": {"manufacturer": "Flock Safety", "surveillance:type": "ALPR"},
+                    "properties": {"manufacturer": "Flock Safety", "surveillance:type": "ALPR", "camera:direction": "-45"},
                 },
                 {
                     "geometry": {"type": "Point", "coordinates": [-73.2, 40.3]},
@@ -26,31 +26,31 @@ class BuildFlockOverlayTests(unittest.TestCase):
 
         self.assertEqual(
             list(build_flock_overlay.feature_points(payload)),
-            [(40.2, -73.1, 2), (40.3, -73.2, 1), (40.4, -73.3, 0)],
+            [(40.2, -73.1, 2, 315.0), (40.3, -73.2, 1, None), (40.4, -73.3, 0, None)],
         )
 
     def test_write_csv_tile(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "6" / "18" / "25.csv"
 
-            build_flock_overlay.write_csv_tile(path, [(40.2, -73.1, 2)])
+            build_flock_overlay.write_csv_tile(path, [(40.2, -73.1, 2, 90.0)])
 
-            self.assertIn("40.2000000,-73.1000000,2", path.read_text(encoding="utf-8"))
+            self.assertIn("40.2000000,-73.1000000,2,90.0", path.read_text(encoding="utf-8"))
 
     def test_deflockhopper_points(self):
         payload = [
-            {"lat": 35.1, "lon": -101.9, "brand": "Flock Safety"},
+            {"lat": 35.1, "lon": -101.9, "brand": "Flock Safety", "direction": 270},
             {"lat": 37.6, "lon": -122.1, "surveillanceType": "ALPR"},
             {"lat": "bad", "lon": -122.1},
         ]
 
         self.assertEqual(
             list(build_flock_overlay.deflockhopper_points(payload)),
-            [(35.1, -101.9, 2), (37.6, -122.1, 1)],
+            [(35.1, -101.9, 2, 270.0), (37.6, -122.1, 1, None)],
         )
 
     def test_group_points_by_tile_filters_bbox(self):
-        points = [(35.1, -101.9, 2), (10.0, -101.9, 2)]
+        points = [(35.1, -101.9, 2, 270.0), (10.0, -101.9, 2, None)]
 
         grouped = build_flock_overlay.group_points_by_tile(points, (-125, 24, -66, 50), 6)
 

@@ -65,6 +65,31 @@ static void zoom(View *view, float factor) {
     view->highFramerate = true;
 }
 
+static void pan(View *view, float dx, float dy) {
+    view->moveCenterRelative(dx, dy);
+    view->mapTargetLat = 0;
+    view->mapTargetLon = 0;
+    view->mapTargetMaxDist = 0;
+    view->mapMoved = 1;
+    view->highFramerate = true;
+}
+
+static void panNorth(View *view) {
+    pan(view, 0, -0.12f * view->screen_height);
+}
+
+static void panSouth(View *view) {
+    pan(view, 0, 0.12f * view->screen_height);
+}
+
+static void panWest(View *view) {
+    pan(view, -0.12f * view->screen_width, 0);
+}
+
+static void panEast(View *view) {
+    pan(view, 0.12f * view->screen_width, 0);
+}
+
 static void recenter(View *view, AppData *appData) {
     view->centerLat = appData->modes.fUserLat;
     view->centerLon = appData->modes.fUserLon;
@@ -75,26 +100,22 @@ static void recenter(View *view, AppData *appData) {
     view->highFramerate = true;
 }
 
-static void pan(View *view, float dx, float dy) {
-    view->moveCenterRelative(dx, dy);
-}
-
 static void handleControllerButton(Input *input, int button) {
     switch(button) {
         case SDL_CONTROLLER_BUTTON_DPAD_UP:
-            pan(input->view, 0, 0.12f * input->view->screen_height);
+            panNorth(input->view);
         break;
 
         case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
-            pan(input->view, 0, -0.12f * input->view->screen_height);
+            panSouth(input->view);
         break;
 
         case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-            pan(input->view, 0.12f * input->view->screen_width, 0);
+            panWest(input->view);
         break;
 
         case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-            pan(input->view, -0.12f * input->view->screen_width, 0);
+            panEast(input->view);
         break;
 
         case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
@@ -153,19 +174,19 @@ static void handleJoystickButton(Input *input, int button) {
 
 static void handleJoystickHat(Input *input, Uint8 value) {
     if(value & SDL_HAT_UP) {
-        pan(input->view, 0, 0.12f * input->view->screen_height);
+        panNorth(input->view);
     }
 
     if(value & SDL_HAT_DOWN) {
-        pan(input->view, 0, -0.12f * input->view->screen_height);
+        panSouth(input->view);
     }
 
     if(value & SDL_HAT_LEFT) {
-        pan(input->view, 0.12f * input->view->screen_width, 0);
+        panWest(input->view);
     }
 
     if(value & SDL_HAT_RIGHT) {
-        pan(input->view, -0.12f * input->view->screen_width, 0);
+        panEast(input->view);
     }
 }
 
@@ -222,25 +243,25 @@ void Input::getInput()
                     case SDLK_UP:
                     case SDLK_w:
                     case SDLK_k:
-                        view->moveCenterRelative(0, 0.12f * view->screen_height);
+                        panNorth(view);
                     break;
 
                     case SDLK_DOWN:
                     case SDLK_s:
                     case SDLK_j:
-                        view->moveCenterRelative(0, -0.12f * view->screen_height);
+                        panSouth(view);
                     break;
 
                     case SDLK_LEFT:
                     case SDLK_a:
                     case SDLK_h:
-                        view->moveCenterRelative(0.12f * view->screen_width, 0);
+                        panWest(view);
                     break;
 
                     case SDLK_RIGHT:
                     case SDLK_d:
                     case SDLK_l:
-                        view->moveCenterRelative(-0.12f * view->screen_width, 0);
+                        panEast(view);
                     break;
 
                     case SDLK_HOME:
@@ -444,6 +465,5 @@ Input::Input(AppData *appData, View *view) {
         }
     }
 }
-
 
 

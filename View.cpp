@@ -137,12 +137,16 @@ static int clampInt(int value, int minValue, int maxValue) {
 
 static SDL_Color flockColorForKind(int kind) {
     if(kind >= 2) {
-        return {255, 150, 40, 180};
+        return {255, 150, 40, 230};
     }
     if(kind == 1) {
-        return {255, 70, 220, 150};
+        return {255, 70, 220, 210};
     }
-    return {80, 220, 255, 120};
+    return {80, 220, 255, 190};
+}
+
+static int wrapAlpha(int value) {
+    return clampInt(value, 0, 255);
 }
 
 
@@ -1158,8 +1162,19 @@ FlockTileCacheEntry *View::loadFlockTile(int x, int y) {
             std::replace(line.begin(), line.end(), ',', ' ');
             std::istringstream iss(line);
             FlockPoint point;
+            point.heading = 0.0f;
+            point.has_heading = false;
             if(!(iss >> point.lat >> point.lon >> point.kind)) {
                 continue;
+            }
+            if(iss >> point.heading) {
+                while(point.heading < 0.0f) {
+                    point.heading += 360.0f;
+                }
+                while(point.heading >= 360.0f) {
+                    point.heading -= 360.0f;
+                }
+                point.has_heading = true;
             }
             if(point.lat < -90.0f || point.lat > 90.0f || point.lon < -180.0f || point.lon > 180.0f) {
                 continue;
@@ -1205,6 +1220,10 @@ void View::drawFlockOverlay() {
     int yMin = tileYFromLat(north, flock_zoom);
     int yMax = tileYFromLat(south, flock_zoom);
     int drawn = 0;
+    float detailFactor = clamp((18.0f - maxDist) / 14.0f, 0.0f, 1.0f);
+    float pulse = fmodf(static_cast<float>(SDL_GetTicks()) / 1200.0f, 1.0f);
+    int coreRadius = 4 + static_cast<int>(roundf(4.0f * detailFactor));
+    int ringBase = coreRadius + 5 + static_cast<int>(roundf(5.0f * detailFactor));
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
@@ -1229,8 +1248,37 @@ void View::drawFlockOverlay() {
                 }
 
                 SDL_Color color = flockColorForKind(point->kind);
-                filledCircleRGBA(renderer, screenX, screenY, 3, color.r, color.g, color.b, color.a);
-                pixelRGBA(renderer, screenX, screenY, 255, 255, 255, std::min(180, static_cast<int>(color.a) + 30));
+                int radius = coreRadius + (point->kind >= 2 ? 1 : 0);
+                int ringOne = ringBase + static_cast<int>(roundf(pulse * (8.0f + 8.0f * detailFactor)));
+                int ringTwo = ringBase + static_cast<int>(roundf(fmodf(pulse + 0.5f, 1.0f) * (8.0f + 8.0f * detailFactor)));
+                int ringAlphaOne = wrapAlpha(static_cast<int>((1.0f - pulse) * (120.0f + 45.0f * detailFactor)));
+                int ringAlphaTwo = wrapAlpha(static_cast<int>((1.0f - fmodf(pulse + 0.5f, 1.0f)) * (75.0f + 35.0f * detailFactor)));
+
+                circleRGBA(renderer, screenX, screenY, ringOne, color.r, color.g, color.b, ringAlphaOne);
+                circleRGBA(renderer, screenX, screenY, ringOne + 1, color.r, color.g, color.b, ringAlphaOne / 2);
+                circleRGBA(renderer, screenX, screenY, ringTwo, color.r, color.g, color.b, ringAlphaTwo);
+
+                if(point->has_heading) {
+                    float radians = point->heading * static_cast<float>(M_PI) / 180.0f;
+                    float noseX = sinf(radians);
+                    float noseY = -cosf(radians);
+                    float sideX = cosf(radians);
+                    float sideY = sinf(radians);
+                    int length = radius + 12 + static_cast<int>(roundf(8.0f * detailFactor));
+                    int halfWidth = 5 + static_cast<int>(roundf(3.0f * detailFactor));
+                    Sint16 x1 = static_cast<Sint16>(screenX + noseX * length);
+                    Sint16 y1 = static_cast<Sint16>(screenY + noseY * length);
+                    Sint16 x2 = static_cast<Sint16>(screenX - noseX * radius + sideX * halfWidth);
+                    Sint16 y2 = static_cast<Sint16>(screenY - noseY * radius + sideY * halfWidth);
+                    Sint16 x3 = static_cast<Sint16>(screenX - noseX * radius - sideX * halfWidth);
+                    Sint16 y3 = static_cast<Sint16>(screenY - noseY * radius - sideY * halfWidth);
+                    filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, color.r, color.g, color.b, 90);
+                    trigonRGBA(renderer, x1, y1, x2, y2, x3, y3, 255, 255, 255, 120);
+                }
+
+                filledCircleRGBA(renderer, screenX, screenY, radius, color.r, color.g, color.b, color.a);
+                circleRGBA(renderer, screenX, screenY, radius + 1, 255, 255, 255, 170);
+                pixelRGBA(renderer, screenX, screenY, 255, 255, 255, 230);
                 drawn++;
             }
         }
@@ -2140,8 +2188,8 @@ void View::draw() {
     zoomMapToTarget();
 
     drawGeography();
-    drawFlockOverlay();
     drawWeatherOverlay();
+    drawFlockOverlay();
     drawScaleBars();
 
     if(appData->connected) {

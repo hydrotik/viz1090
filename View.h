@@ -81,6 +81,8 @@ typedef struct FlockPoint {
     float lat;
     float lon;
     int kind;
+    float heading;
+    bool has_heading;
 } FlockPoint;
 
 typedef struct FlockTileCacheEntry {
