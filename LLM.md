@@ -279,6 +279,41 @@ Weather UI validation:
 - `--weather-file <path>` renders rows of `lat_min,lon_min,lat_max,lon_max,intensity`, where intensity is 1 green, 2 yellow, 3 red, 4 magenta.
 - This is only a UI overlay simulator; it is not live weather and should not be used for navigation decisions.
 
+## Future Bluetooth Detector Integration
+
+Uniden R8 integration is plausible because the Android Highway Radar app supports the R8 over Bluetooth, which implies the detector exposes live alert data over a Bluetooth/BLE protocol that third-party software can consume. Treat the protocol as undocumented until proven otherwise.
+
+Future R8 work should start with a separate bridge rather than putting Bluetooth code directly into the SDL renderer:
+
+1. Pair the R8 to the uConsole with `bluetoothctl`.
+2. Use a Python BLE probe such as `bleak` to list GATT services/characteristics and subscribe to notification characteristics.
+3. Log raw packets while creating known alerts, muting, changing bands, changing arrows/direction, and toggling detector settings.
+4. Decode the packet fields into a normalized JSON file or local socket, for example `/run/user/$(id -u)/viz1090-r8.json`.
+5. Add a small viz1090 overlay/status panel that reads the normalized feed and displays detector connection state, band, frequency, signal strength, directional arrows, mute state, and timestamp.
+
+Likely bridge shape:
+
+```text
+Uniden R8 Bluetooth/BLE
+  -> tools/r8_probe.py / tools/r8_bridge.py
+  -> /run/user/1000/viz1090-r8.json
+  -> viz1090 detector overlay
+```
+
+Potential constraints:
+
+- The R8 may allow only one active Bluetooth client. If Highway Radar is connected from an Android phone, the uConsole may not be able to connect at the same time.
+- Some R8 Bluetooth behavior may be BLE GATT notifications; some devices expose classic Bluetooth serial profiles. Probe before assuming either path.
+- Keep the bridge optional. viz1090 should start normally when the detector is absent.
+- Keep detector data separate from ADS-B/weather. Do not retune or interrupt the RTL-SDR for Bluetooth work.
+
+uConsole Bluetooth/SDR notes:
+
+- The uConsole SDR/AIO expansion includes the RTL-SDR path for ADS-B/UAT plus other expansion features; Bluetooth is handled by the uConsole/Linux Bluetooth stack, not by the RTL-SDR tuner.
+- Using Bluetooth for R8 data should not conflict with the SDR radio path, but it can share CPU, power, and USB/Bluetooth subsystem resources on the uConsole.
+- Before field use, test Bluetooth connection stability while `dump1090-mutability`, viz1090 rendering, weather updater, GPS probing, and the FLOCK overlay are all active.
+- Useful first commands: `bluetoothctl scan on`, `bluetoothctl info <R8-MAC>`, `bluetoothctl pair/trust/connect <R8-MAC>`, then a BLE service dump from a future `tools/r8_probe.py`.
+
 ## Cleanup Already Applied
 
 Initial cleanup in this checkout:

@@ -441,6 +441,8 @@ If a physical uConsole key does not behave as expected, run `./run_uconsole.sh -
 
 Radar/precipitation over RF is a separate receive path from 1090 MHz ADS-B traffic. In the United States, ADS-B weather products are provided through FIS-B on UAT 978 MHz. With one RTL-SDR tuner, the practical approach is to periodically retune from 1090 MHz traffic to 978 MHz weather, cache decoded weather, then return to 1090 MHz. For simultaneous traffic and weather, use a second SDR/tuner.
 
+Future detector overlay work: the Uniden R8 can integrate with the Android Highway Radar app over Bluetooth, so viz1090 may be able to consume R8 alert data through a small BLE bridge. Keep this outside the renderer: probe/pair with `bluetoothctl`, decode R8 notifications in a future `tools/r8_bridge.py`, write normalized detector state to `/run/user/$(id -u)/viz1090-r8.json`, and let viz1090 render that optional feed. Bluetooth should not conflict with the RTL-SDR tuner path, but test it under full uConsole load.
+
 3. (Windows only)
 
 As WSL does not have an X server built in, you will need to install a 3rd party X server, such as https://sourceforge.net/projects/vcxsrv/
