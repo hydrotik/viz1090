@@ -521,10 +521,27 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
     float offscreenPx = std::max(0.0f, inmag - edgeMag);
     int markerLength = static_cast<int>(roundf((10.0f + std::min(20.0f, log1pf(offscreenPx) * 3.0f)) * screen_uiscale));
     int markerThickness = std::max(4, static_cast<int>(roundf(12.0f * screen_uiscale)));
+    int echoThickness = std::max(1, static_cast<int>(roundf(3.0f * screen_uiscale)));
+    float pulse = fmodf(static_cast<float>(SDL_GetTicks()) / 950.0f, 1.0f);
+    int echoOffset = static_cast<int>(roundf((8.0f + pulse * 34.0f) * screen_uiscale));
+    int echoAlpha = wrapAlpha(static_cast<int>((1.0f - pulse) * 135.0f));
     bool sideEdge = fabs(outx) >= (screen_width * 0.5f - 1.0f);
 
     if(sideEdge) {
         edgeY = clampInt(edgeY, markerLength / 2, drawableBottom - markerLength / 2);
+        int direction = edgeX < centerX ? 1 : -1;
+        int echoX = clampInt(edgeX + direction * echoOffset, 0, screen_width - 1);
+        thickLineRGBA(
+            renderer,
+            echoX,
+            edgeY - markerLength / 2,
+            echoX,
+            edgeY + markerLength / 2,
+            echoThickness,
+            planeColor.r,
+            planeColor.g,
+            planeColor.b,
+            echoAlpha);
         thickLineRGBA(
             renderer,
             edgeX,
@@ -539,6 +556,19 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
     } else {
         edgeY = outy > 0.0f ? drawableBottom : 0;
         edgeX = clampInt(edgeX, markerLength / 2, screen_width - markerLength / 2);
+        int direction = edgeY < centerY ? 1 : -1;
+        int echoY = clampInt(edgeY + direction * echoOffset, 0, drawableBottom);
+        thickLineRGBA(
+            renderer,
+            edgeX - markerLength / 2,
+            echoY,
+            edgeX + markerLength / 2,
+            echoY,
+            echoThickness,
+            planeColor.r,
+            planeColor.g,
+            planeColor.b,
+            echoAlpha);
         thickLineRGBA(
             renderer,
             edgeX - markerLength / 2,
