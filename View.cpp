@@ -489,8 +489,6 @@ void View::drawStatus() {
 
 void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color planeColor) {
 
-    float arrowWidth = 6.0 * screen_uiscale;
-
     float inx = x - (screen_width>>1);
     float iny = y - (screen_height>>1);
     
@@ -500,73 +498,59 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
 
     if(abs(inx) > abs(y - (screen_height>>1)) *  static_cast<float>(screen_width>>1) / static_cast<float>(screen_height>>1)) { //left / right quadrants
         outx = (screen_width>>1) * ((inx > 0) ? 1.0 : -1.0);
-        outy = (outx) * iny / (inx);
+        outy = inx == 0.0f ? 0.0f : (outx) * iny / (inx);
     } else { // up / down quadrants
         outy = screen_height * ((iny > 0) ? 0.5 : -0.5 );
-        outx = (outy) * inx / (iny);
+        outx = iny == 0.0f ? 0.0f : (outy) * inx / (iny);
     }
-
-    // circleRGBA (renderer,(screen_width>>1) + outx, screen_height * CENTEROFFSET + outy,50,planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
-    // thickLineRGBA(renderer,screen_width>>1,screen_height * CENTEROFFSET, (screen_width>>1) + outx, screen_height * CENTEROFFSET + outy,arrowWidth,planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
 
     float inmag = sqrt(inx *inx + iny*iny);
     if(inmag <= 0.0f) {
         return;
     }
 
-    float vec[3];
-    vec[0] = inx / inmag;
-    vec[1] = iny /inmag;
-    vec[2] = 0;
-
-    float up[] = {0,0,1};
-
-    float out[3];
-
-    CROSSVP(out,vec,up);
-
-    int x1, x2, x3, y1, y2, y3;
     int centerX = screen_width>>1;
     int centerY = screen_height>>1;
     int edgeX = centerX + static_cast<int>(round(outx));
     int edgeY = centerY + static_cast<int>(round(outy));
-    int lineStartX = centerX + static_cast<int>(round(vec[0] * 24.0f * screen_uiscale));
-    int lineStartY = centerY + static_cast<int>(round(vec[1] * 24.0f * screen_uiscale));
-    int lineEndX = edgeX - static_cast<int>(round(vec[0] * arrowWidth * 4.0f));
-    int lineEndY = edgeY - static_cast<int>(round(vec[1] * arrowWidth * 4.0f));
+    float edgeMag = sqrt(outx * outx + outy * outy);
+    float offscreenPx = std::max(0.0f, inmag - edgeMag);
+    int markerLength = static_cast<int>(roundf((10.0f + std::min(20.0f, log1pf(offscreenPx) * 3.0f)) * screen_uiscale));
+    int markerThickness = std::max(2, static_cast<int>(roundf(4.0f * screen_uiscale)));
+    bool sideEdge = fabs(outx) >= (screen_width * 0.5f - 1.0f);
 
-    thickLineRGBA(
-        renderer,
-        lineStartX,
-        lineStartY,
-        lineEndX,
-        lineEndY,
-        std::max(1, static_cast<int>(round(2.0f * screen_uiscale))),
-        planeColor.r,
-        planeColor.g,
-        planeColor.b,
-        115);
+    if(sideEdge) {
+        edgeY = clampInt(edgeY, markerLength / 2, screen_height - markerLength / 2);
+        thickLineRGBA(
+            renderer,
+            edgeX,
+            edgeY - markerLength / 2,
+            edgeX,
+            edgeY + markerLength / 2,
+            markerThickness,
+            planeColor.r,
+            planeColor.g,
+            planeColor.b,
+            230);
+    } else {
+        edgeX = clampInt(edgeX, markerLength / 2, screen_width - markerLength / 2);
+        thickLineRGBA(
+            renderer,
+            edgeX - markerLength / 2,
+            edgeY,
+            edgeX + markerLength / 2,
+            edgeY,
+            markerThickness,
+            planeColor.r,
+            planeColor.g,
+            planeColor.b,
+            230);
+    }
 
-    // arrow 1
-    x1 = centerX + outx - 2.0 * arrowWidth * vec[0] + round(-arrowWidth*out[0]);
-    y1 = centerY + outy - 2.0 * arrowWidth * vec[1] + round(-arrowWidth*out[1]);
-    x2 = centerX + outx - 2.0 * arrowWidth * vec[0] + round(arrowWidth*out[0]);
-    y2 = centerY + outy - 2.0 * arrowWidth * vec[1] + round(arrowWidth*out[1]);
-    x3 = centerX +  outx - arrowWidth * vec[0];
-    y3 = centerY + outy - arrowWidth * vec[1];
-    filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
+    filledCircleRGBA(renderer, edgeX, edgeY, std::max(2, markerThickness / 2), planeColor.r, planeColor.g, planeColor.b, 180);
 
-    // arrow 2
-    x1 = centerX + outx - 3.0 * arrowWidth * vec[0] + round(-arrowWidth*out[0]);
-    y1 = centerY + outy - 3.0 * arrowWidth * vec[1] + round(-arrowWidth*out[1]);
-    x2 = centerX + outx - 3.0 * arrowWidth * vec[0] + round(arrowWidth*out[0]);
-    y2 = centerY + outy - 3.0 * arrowWidth * vec[1] + round(arrowWidth*out[1]);
-    x3 = centerX +  outx - 2.0 * arrowWidth * vec[0];
-    y3 = centerY + outy - 2.0 * arrowWidth * vec[1];
-    filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
-
-    *returnx = x3;
-    *returny = y3;
+    *returnx = edgeX;
+    *returny = edgeY;
 }
 
 void View::drawPlaneIcon(int x, int y, float heading, SDL_Color planeColor)
