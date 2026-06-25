@@ -251,7 +251,22 @@ To sync code and selected raster packs to the uConsole:
 ./deploy_uconsole.sh --tiles conus-regions
 ```
 
-`starter` syncs the national overview, Northeast, and NYC packs when present. `conus-regions` syncs the lower-48 overview and the six regional packs. `travel-hd` syncs the z14 West Coast, z14 Mountain West, z14 Arizona, and z15 NY/NJ/CT tri-state packs when present. Missing packs are skipped, so it is safe to run before every region has been generated.
+`starter` syncs the national overview, Northeast, and NYC packs when present. `conus-regions` syncs the lower-48 overview and the six regional packs. `travel-hd` syncs the z14 West Coast, z14 Mountain West, z14 Arizona, and z15 NY/NJ/CT tri-state packs when present. `focused-hd` is the preferred storage-conscious travel set: lower-48 overview, Northeast fallback, z15 tri-state, z16 NYC/western Long Island, z14 West Coast, z14 Mountain West, and z14 Arizona. It intentionally skips lower-priority central/northern packs such as Midwest/Great Lakes and South Central. Missing packs are skipped, so it is safe to run before every region has been generated.
+
+For sharper NYC and western Long Island map detail without expanding the whole tri-state pack, build the focused z16 pack:
+
+```
+python3 tools/build_map_tile_pack.py \
+  --tile-url 'http://127.0.0.1:8080/styles/basic-preview/{z}/{x}/{y}.png' \
+  --profiles nyc-west-li-ultra \
+  --force
+```
+
+Then sync the storage-conscious set:
+
+```
+./deploy_uconsole.sh --tiles focused-hd
+```
 
 For a sharper NYC-first test pack:
 

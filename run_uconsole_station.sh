@@ -20,7 +20,7 @@ WEATHER_MIN_PIXELS="3"
 FLOCK=1
 FLOCK_DIR="mapdata/flock"
 FLOCK_MAX_POINTS="5000"
-TILE_MAX_ZOOM="15"
+TILE_MAX_ZOOM="16"
 TILE_MIN_BYTES="2048"
 TILE_OPACITY="204"
 WEATHER=1
@@ -66,7 +66,7 @@ Options:
   --flock / --no-flock        Draw local FLOCK/surveillance overlay when available. Default: --flock
   --flock-dir <path>          Local FLOCK overlay directory. Default: mapdata/flock
   --flock-max-points <n>      Maximum FLOCK points drawn per frame. Default: 5000
-  --tile-max-zoom <z>         Maximum raster basemap zoom. Default: 15
+  --tile-max-zoom <z>         Maximum raster basemap zoom. Default: 16
   --tile-min-bytes <n>        Skip tiny MBTiles placeholders below n bytes. Default: 2048
   --tile-opacity <0-255>      Raster basemap opacity. Default: 204
   --rf-weather                Try RF UAT/FIS-B before network fallback.

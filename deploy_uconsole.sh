@@ -21,13 +21,14 @@ Options:
   --ssh-key <path>           Default: ~/.ssh/codex_uconsole_nopass
   --remote-dir <path>        Default: ~/viz1090
   --tiles [profiles...]      Sync raster packs. Profiles/groups: starter,
-                             conus-regions, all-us, nyc, northeast, etc.
+                             focused-hd, conus-regions, all-us, nyc, northeast, etc.
   --run                      Start ./run_uconsole_station.sh after syncing.
   --help                     Show this help.
 
 Examples:
   ./deploy_uconsole.sh
   ./deploy_uconsole.sh --tiles starter
+  ./deploy_uconsole.sh --tiles focused-hd
   ./deploy_uconsole.sh --tiles conus-regions -- --weather-profile regional
   ./deploy_uconsole.sh --run -- --map-tile-profile auto --weather-profile regional
 EOF

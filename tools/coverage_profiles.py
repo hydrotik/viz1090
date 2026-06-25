@@ -93,6 +93,14 @@ MAP_PROFILES = {
         "output": "mapdata/tiles/tri-state-ultra-raster.mbtiles",
         "priority": 140,
     },
+    "nyc-west-li-ultra": {
+        "label": "NYC and western Long Island ultra detail",
+        "bbox": (-74.35, 40.48, -72.95, 41.08),
+        "min_zoom": 0,
+        "max_zoom": 16,
+        "output": "mapdata/tiles/nyc-west-li-ultra-raster.mbtiles",
+        "priority": 160,
+    },
     "alaska": {
         "label": "Alaska",
         "bbox": (-170.0, 51.0, -129.0, 72.0),
@@ -194,6 +202,8 @@ def profile_names_for_group(group):
         return ["west-coast-hd", "mountain-west-hd", "arizona-hd"]
     if group == "travel-hd":
         return ["west-coast-hd", "mountain-west-hd", "arizona-hd", "tri-state-ultra"]
+    if group == "focused-hd":
+        return ["conus-overview", "northeast", "tri-state-ultra", "nyc-west-li-ultra", "west-coast-hd", "mountain-west-hd", "arizona-hd"]
     return [group]
 
 

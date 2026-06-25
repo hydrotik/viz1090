@@ -55,6 +55,26 @@ class CoverageProfilesTests(unittest.TestCase):
             self.assertEqual(name, "tri-state-ultra")
             self.assertEqual(path.name, "tri-state-ultra-raster.mbtiles")
 
+    def test_select_map_prefers_nyc_west_li_ultra_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tiles_dir = Path(tmp)
+            (tiles_dir / "tri-state-ultra-raster.mbtiles").write_bytes(b"tri-state")
+            (tiles_dir / "nyc-west-li-ultra-raster.mbtiles").write_bytes(b"nyc-li")
+
+            name, path = coverage_profiles.select_map_profile(40.723972, -73.845139, tiles_dir)
+
+            self.assertEqual(name, "nyc-west-li-ultra")
+            self.assertEqual(path.name, "nyc-west-li-ultra-raster.mbtiles")
+
+    def test_focused_hd_group_includes_targeted_high_detail_without_midwest(self):
+        names = coverage_profiles.profile_names_for_group("focused-hd")
+
+        self.assertIn("nyc-west-li-ultra", names)
+        self.assertIn("tri-state-ultra", names)
+        self.assertIn("arizona-hd", names)
+        self.assertNotIn("midwest", names)
+        self.assertNotIn("south-central", names)
+
     def test_local_weather_bbox_is_centered_near_location(self):
         bbox = coverage_profiles.local_weather_bbox(40.0, -75.0)
 
