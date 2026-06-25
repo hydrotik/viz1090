@@ -137,12 +137,12 @@ static int clampInt(int value, int minValue, int maxValue) {
 
 static SDL_Color flockColorForKind(int kind) {
     if(kind >= 2) {
-        return {255, 150, 40, 230};
+        return {178, 58, 52, 150};
     }
     if(kind == 1) {
-        return {255, 70, 220, 210};
+        return {150, 48, 58, 125};
     }
-    return {80, 220, 255, 190};
+    return {120, 45, 52, 105};
 }
 
 static int wrapAlpha(int value) {
@@ -1251,7 +1251,6 @@ void View::drawFlockOverlay() {
                 if(detailFactor < 0.25f) {
                     int dotRadius = point->kind >= 2 ? 4 : 3;
                     filledCircleRGBA(renderer, screenX, screenY, dotRadius, color.r, color.g, color.b, color.a);
-                    pixelRGBA(renderer, screenX, screenY, 255, 255, 255, 200);
                     drawn++;
                     continue;
                 }
@@ -1280,13 +1279,13 @@ void View::drawFlockOverlay() {
                     Sint16 y2 = static_cast<Sint16>(screenY - noseY * radius + sideY * halfWidth);
                     Sint16 x3 = static_cast<Sint16>(screenX - noseX * radius - sideX * halfWidth);
                     Sint16 y3 = static_cast<Sint16>(screenY - noseY * radius - sideY * halfWidth);
-                    filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, color.r, color.g, color.b, 90);
-                    trigonRGBA(renderer, x1, y1, x2, y2, x3, y3, 255, 255, 255, 120);
+                    filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, color.r, color.g, color.b, 55);
+                    trigonRGBA(renderer, x1, y1, x2, y2, x3, y3, color.r, color.g, color.b, 95);
                 }
 
                 filledCircleRGBA(renderer, screenX, screenY, radius, color.r, color.g, color.b, color.a);
-                circleRGBA(renderer, screenX, screenY, radius + 1, 255, 255, 255, 170);
-                pixelRGBA(renderer, screenX, screenY, 255, 255, 255, 230);
+                circleRGBA(renderer, screenX, screenY, radius + 1, 60, 18, 22, 135);
+                pixelRGBA(renderer, screenX, screenY, 215, 108, 105, 140);
                 drawn++;
             }
         }
@@ -1919,6 +1918,15 @@ void View::drawPlanes() {
                             useHeading = lerpAngle(p->getLastHeading(),useHeading,elapsed(p->msSeenLatLon) / 500.0);
                         }
 
+                        filledCircleRGBA(
+                            renderer,
+                            usex,
+                            usey,
+                            static_cast<int>(roundf(13.0f * screen_uiscale * plane_scale)),
+                            0,
+                            0,
+                            0,
+                            135);
                         drawPlaneIcon(usex, usey, useHeading, planeColor);
                     }
 
