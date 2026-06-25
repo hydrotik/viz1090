@@ -513,14 +513,18 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
     int centerY = screen_height>>1;
     int edgeX = centerX + static_cast<int>(round(outx));
     int edgeY = centerY + static_cast<int>(round(outy));
+    int drawableBottom = screen_height - statusFontHeight - 3 * PAD;
+    if(drawableBottom < screen_height / 2) {
+        drawableBottom = screen_height;
+    }
     float edgeMag = sqrt(outx * outx + outy * outy);
     float offscreenPx = std::max(0.0f, inmag - edgeMag);
     int markerLength = static_cast<int>(roundf((10.0f + std::min(20.0f, log1pf(offscreenPx) * 3.0f)) * screen_uiscale));
-    int markerThickness = std::max(2, static_cast<int>(roundf(4.0f * screen_uiscale)));
+    int markerThickness = std::max(4, static_cast<int>(roundf(12.0f * screen_uiscale)));
     bool sideEdge = fabs(outx) >= (screen_width * 0.5f - 1.0f);
 
     if(sideEdge) {
-        edgeY = clampInt(edgeY, markerLength / 2, screen_height - markerLength / 2);
+        edgeY = clampInt(edgeY, markerLength / 2, drawableBottom - markerLength / 2);
         thickLineRGBA(
             renderer,
             edgeX,
@@ -533,6 +537,7 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
             planeColor.b,
             230);
     } else {
+        edgeY = outy > 0.0f ? drawableBottom : 0;
         edgeX = clampInt(edgeX, markerLength / 2, screen_width - markerLength / 2);
         thickLineRGBA(
             renderer,
@@ -1927,9 +1932,8 @@ void View::drawPlanes() {
                         }
 
                         drawPlaneIcon(usex, usey, useHeading, planeColor);
+                        drawPlaneText(p);
                     }
-
-                    drawPlaneText(p);            
                 }
             } else {
                 circleRGBA(renderer, x, y, 8 * (1000 * DISPLAY_ACTIVE - elapsed(p->msSeen)) / 500, style.planeGoneColor.r, style.planeGoneColor.g, style.planeGoneColor.b, 255);
