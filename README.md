@@ -115,6 +115,16 @@ For the normal uConsole field workflow, use the station launcher instead. It bui
 ./run_uconsole_station.sh --tiles mapdata/tiles/nyc-raster.mbtiles
 ```
 
+Useful station controls:
+
+```
+./run_uconsole_station.sh --status
+./run_uconsole_station.sh --stop
+./run_uconsole_station.sh --restart --map-tile-profile auto --weather-profile regional
+```
+
+`--status` reports running viz1090/weather processes, selected raster pack, disk headroom, weather cache age, and FLOCK tile count. Use `--stop` instead of ad hoc `pkill -f` commands; broad process matches can kill the SSH shell that issued them.
+
 Use `--debug-weather` only while troubleshooting. Normal use should leave it off. If the weather layer is hard to see on the uConsole screen, the station launcher defaults to larger high-contrast radar cells; tune with `--weather-min-pixels`.
 
 When syncing source code to the uConsole with `rsync --delete`, exclude local map data so offline caches and generated maps are not removed from the device:
@@ -386,6 +396,13 @@ For normal field use with installed regional packs, prefer:
 
 ```
 ./run_uconsole_station.sh --map-tile-profile auto --weather-profile regional
+```
+
+To check or stop the current field session:
+
+```
+./run_uconsole_station.sh --status
+./run_uconsole_station.sh --stop
 ```
 
 Optional FLOCK/DeFlock camera overlay:

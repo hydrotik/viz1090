@@ -32,6 +32,8 @@ REGEN_MAP=0
 SCREENSHOT_FILE=""
 SCREENSHOT_DELAY_MS="3000"
 SCREENSHOT_EXIT=0
+ACTION="run"
+STOP_FIRST=0
 APP_EXTRA=()
 
 usage() {
@@ -75,8 +77,110 @@ Options:
   --screenshot-delay-ms <ms>  Delay before screenshot capture. Default: 3000
   --screenshot-exit           Exit after saving screenshot.
   --regen-map                 Regenerate generated map data.
+  --status                    Print station health and exit.
+  --stop                      Stop viz1090 station/app/weather processes and exit.
+  --restart                   Stop existing station processes before starting.
   --help                      Show this help.
 EOF
+}
+
+process_rows() {
+    local output
+    output="$(ps -eo pid=,args= 2>/dev/null || true)"
+    [[ -z "${output}" ]] && return 0
+    printf '%s\n' "${output}" | while IFS= read -r line; do
+        pid="${line%% *}"
+        args="${line#${pid}}"
+        args="${args# }"
+        [[ -z "${pid}" || "${pid}" == "$$" || "${pid}" == "${BASHPID:-}" ]] && continue
+        case "${args}" in
+            *"./viz1090"*|*"run_uconsole.sh"*|*"run_uconsole_station.sh"*|*"run_weather_hybrid_cycle.sh"*|*"tools/weather_hybrid_cycle.py"*)
+                printf '%s\t%s\n' "${pid}" "${args}"
+                ;;
+        esac
+    done
+}
+
+print_file_age() {
+    local path="$1"
+    if [[ ! -f "${path}" ]]; then
+        echo "missing"
+        return
+    fi
+    python3 -c 'import os, sys, time; p=sys.argv[1]; age=max(0, int(time.time()-os.path.getmtime(p))); print(f"{age}s old")' "${path}" 2>/dev/null || echo "present"
+}
+
+print_status() {
+    echo "viz1090 station status"
+    echo
+    echo "Processes:"
+    if ! process_rows | sed 's/^/  /'; then
+        true
+    fi
+    if [[ -z "$(process_rows)" ]]; then
+        echo "  none"
+    fi
+    echo
+    echo "Map tiles:"
+    if [[ -d "${TILES_DIR}" ]]; then
+        if selected="$(python3 tools/coverage_profiles.py select-map --lat "${LAT}" --lon "${LON}" --tiles-dir "${TILES_DIR}" 2>/dev/null)"; then
+            size="$(du -h "${selected}" 2>/dev/null | awk '{print $1}')"
+            echo "  selected: ${selected}${size:+ (${size})}"
+        else
+            echo "  selected: none for ${LAT}, ${LON}"
+        fi
+        echo "  directory: ${TILES_DIR}"
+        df -h "${TILES_DIR}" 2>/dev/null | awk 'NR==2 {print "  disk: "$4" free of "$2" ("$5" used)"}'
+    else
+        echo "  directory missing: ${TILES_DIR}"
+    fi
+    echo
+    echo "Weather:"
+    echo "  cache: weather/radar_tiles.csv ($(print_file_age weather/radar_tiles.csv))"
+    if [[ -f weather/radar_tiles.csv ]]; then
+        echo "  rows: $(wc -l < weather/radar_tiles.csv | tr -d ' ')"
+    fi
+    echo
+    echo "FLOCK:"
+    if [[ -d "${FLOCK_DIR}" ]]; then
+        echo "  directory: ${FLOCK_DIR}"
+        echo "  tile files: $(find "${FLOCK_DIR}" -name '*.csv' 2>/dev/null | wc -l | tr -d ' ')"
+    else
+        echo "  directory missing: ${FLOCK_DIR}"
+    fi
+}
+
+stop_station() {
+    local rows pids pid
+    rows="$(process_rows || true)"
+    if [[ -z "${rows}" ]]; then
+        echo "No viz1090 station processes found."
+        return 0
+    fi
+    echo "Stopping viz1090 station processes:"
+    printf '%s\n' "${rows}" | sed 's/^/  /'
+    pids="$(printf '%s\n' "${rows}" | awk '{print $1}')"
+    for pid in ${pids}; do
+        kill "${pid}" >/dev/null 2>&1 || true
+    done
+    sleep 1
+    for pid in ${pids}; do
+        if kill -0 "${pid}" >/dev/null 2>&1; then
+            kill -TERM "${pid}" >/dev/null 2>&1 || true
+        fi
+    done
+}
+
+warn_low_disk() {
+    local path="$1"
+    local free_kb
+    [[ -d "${path}" ]] || return 0
+    free_kb="$(df -Pk "${path}" 2>/dev/null | awk 'NR==2 {print $4}')"
+    [[ -n "${free_kb}" ]] || return 0
+    if (( free_kb < 2097152 )); then
+        echo "Warning: less than 2 GB free on filesystem for ${path}; tile/weather updates may fail." >&2
+        df -h "${path}" >&2 || true
+    fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -212,6 +316,18 @@ while [[ $# -gt 0 ]]; do
             REGEN_MAP=1
             shift
             ;;
+        --status)
+            ACTION="status"
+            shift
+            ;;
+        --stop)
+            ACTION="stop"
+            shift
+            ;;
+        --restart)
+            STOP_FIRST=1
+            shift
+            ;;
         --help)
             usage
             exit 0
@@ -228,6 +344,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ "${ACTION}" == "status" ]]; then
+    print_status
+    exit 0
+fi
+
+if [[ "${ACTION}" == "stop" ]]; then
+    stop_station
+    exit 0
+fi
+
+if [[ "${STOP_FIRST}" -eq 1 ]]; then
+    stop_station
+fi
+
 weather_pid=""
 cleanup() {
     if [[ -n "${weather_pid}" ]] && kill -0 "${weather_pid}" >/dev/null 2>&1; then
@@ -239,6 +369,8 @@ trap cleanup EXIT INT TERM
 
 make viz1090
 mkdir -p weather
+warn_low_disk "."
+warn_low_disk "${TILES_DIR}"
 
 if [[ "${USE_TILES}" -eq 1 && "${TILES_EXPLICIT}" -eq 0 ]]; then
     if [[ "${MAP_TILE_PROFILE}" == "auto" ]]; then
