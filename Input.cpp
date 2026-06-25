@@ -42,6 +42,7 @@ static std::chrono::high_resolution_clock::time_point now() {
     return std::chrono::high_resolution_clock::now();
 }
 
+
 // static uint64_t now() {
 //     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch).count();
 // }
@@ -75,11 +76,11 @@ static void pan(View *view, float dx, float dy) {
 }
 
 static void panNorth(View *view) {
-    pan(view, 0, -0.12f * view->screen_height);
+    pan(view, 0, 0.12f * view->screen_height);
 }
 
 static void panSouth(View *view) {
-    pan(view, 0, 0.12f * view->screen_height);
+    pan(view, 0, -0.12f * view->screen_height);
 }
 
 static void panWest(View *view) {
@@ -465,4 +466,3 @@ Input::Input(AppData *appData, View *view) {
         }
     }
 }
-

@@ -582,8 +582,6 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
             230);
     }
 
-    filledCircleRGBA(renderer, edgeX, edgeY, std::max(2, markerThickness / 2), planeColor.r, planeColor.g, planeColor.b, 180);
-
     *returnx = edgeX;
     *returny = edgeY;
 }
