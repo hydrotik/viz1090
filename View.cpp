@@ -510,6 +510,10 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
     // thickLineRGBA(renderer,screen_width>>1,screen_height * CENTEROFFSET, (screen_width>>1) + outx, screen_height * CENTEROFFSET + outy,arrowWidth,planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
 
     float inmag = sqrt(inx *inx + iny*iny);
+    if(inmag <= 0.0f) {
+        return;
+    }
+
     float vec[3];
     vec[0] = inx / inmag;
     vec[1] = iny /inmag;
@@ -522,23 +526,43 @@ void View::drawPlaneOffMap(int x, int y, int *returnx, int *returny, SDL_Color p
     CROSSVP(out,vec,up);
 
     int x1, x2, x3, y1, y2, y3;
+    int centerX = screen_width>>1;
+    int centerY = screen_height>>1;
+    int edgeX = centerX + static_cast<int>(round(outx));
+    int edgeY = centerY + static_cast<int>(round(outy));
+    int lineStartX = centerX + static_cast<int>(round(vec[0] * 24.0f * screen_uiscale));
+    int lineStartY = centerY + static_cast<int>(round(vec[1] * 24.0f * screen_uiscale));
+    int lineEndX = edgeX - static_cast<int>(round(vec[0] * arrowWidth * 4.0f));
+    int lineEndY = edgeY - static_cast<int>(round(vec[1] * arrowWidth * 4.0f));
+
+    thickLineRGBA(
+        renderer,
+        lineStartX,
+        lineStartY,
+        lineEndX,
+        lineEndY,
+        std::max(1, static_cast<int>(round(2.0f * screen_uiscale))),
+        planeColor.r,
+        planeColor.g,
+        planeColor.b,
+        115);
 
     // arrow 1
-    x1 = (screen_width>>1) + outx - 2.0 * arrowWidth * vec[0] + round(-arrowWidth*out[0]);
-    y1 = (screen_height>>1) + outy - 2.0 * arrowWidth * vec[1] + round(-arrowWidth*out[1]);
-    x2 = (screen_width>>1) + outx - 2.0 * arrowWidth * vec[0] + round(arrowWidth*out[0]);
-    y2 = (screen_height>>1) + outy - 2.0 * arrowWidth * vec[1] + round(arrowWidth*out[1]);
-    x3 = (screen_width>>1) +  outx - arrowWidth * vec[0];
-    y3 = (screen_height>>1) + outy - arrowWidth * vec[1];
+    x1 = centerX + outx - 2.0 * arrowWidth * vec[0] + round(-arrowWidth*out[0]);
+    y1 = centerY + outy - 2.0 * arrowWidth * vec[1] + round(-arrowWidth*out[1]);
+    x2 = centerX + outx - 2.0 * arrowWidth * vec[0] + round(arrowWidth*out[0]);
+    y2 = centerY + outy - 2.0 * arrowWidth * vec[1] + round(arrowWidth*out[1]);
+    x3 = centerX +  outx - arrowWidth * vec[0];
+    y3 = centerY + outy - arrowWidth * vec[1];
     filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
 
     // arrow 2
-    x1 = (screen_width>>1) + outx - 3.0 * arrowWidth * vec[0] + round(-arrowWidth*out[0]);
-    y1 = (screen_height>>1) + outy - 3.0 * arrowWidth * vec[1] + round(-arrowWidth*out[1]);
-    x2 = (screen_width>>1) + outx - 3.0 * arrowWidth * vec[0] + round(arrowWidth*out[0]);
-    y2 = (screen_height>>1) + outy - 3.0 * arrowWidth * vec[1] + round(arrowWidth*out[1]);
-    x3 = (screen_width>>1) +  outx - 2.0 * arrowWidth * vec[0];
-    y3 = (screen_height>>1) + outy - 2.0 * arrowWidth * vec[1];
+    x1 = centerX + outx - 3.0 * arrowWidth * vec[0] + round(-arrowWidth*out[0]);
+    y1 = centerY + outy - 3.0 * arrowWidth * vec[1] + round(-arrowWidth*out[1]);
+    x2 = centerX + outx - 3.0 * arrowWidth * vec[0] + round(arrowWidth*out[0]);
+    y2 = centerY + outy - 3.0 * arrowWidth * vec[1] + round(arrowWidth*out[1]);
+    x3 = centerX +  outx - 2.0 * arrowWidth * vec[0];
+    y3 = centerY + outy - 2.0 * arrowWidth * vec[1];
     filledTrigonRGBA(renderer, x1, y1, x2, y2, x3, y3, planeColor.r,planeColor.g,planeColor.b,SDL_ALPHA_OPAQUE);
 
     *returnx = x3;
