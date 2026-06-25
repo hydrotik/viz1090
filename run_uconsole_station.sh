@@ -88,12 +88,11 @@ process_rows() {
     local output
     output="$(ps -eo pid=,args= 2>/dev/null || true)"
     [[ -z "${output}" ]] && return 0
-    printf '%s\n' "${output}" | while IFS= read -r line; do
-        pid="${line%% *}"
-        args="${line#${pid}}"
-        args="${args# }"
+    printf '%s\n' "${output}" | while read -r pid args; do
         [[ -z "${pid}" || "${pid}" == "$$" || "${pid}" == "${BASHPID:-}" ]] && continue
         case "${args}" in
+            *"run_uconsole_station.sh --status"*|*"run_uconsole_station.sh --stop"*)
+                ;;
             *"./viz1090"*|*"run_uconsole.sh"*|*"run_uconsole_station.sh"*|*"run_weather_hybrid_cycle.sh"*|*"tools/weather_hybrid_cycle.py"*)
                 printf '%s\t%s\n' "${pid}" "${args}"
                 ;;
